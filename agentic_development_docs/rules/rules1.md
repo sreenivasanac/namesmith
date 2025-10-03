@@ -1,9 +1,33 @@
-I have not decided the project name fully. Let's call it namesmith for now - keep all variable names as namesmith when required. When text are to be dispayed, use a global variable with "Namesmith" for now - such that if I want to update it in the future in one place, that is possible.
+### Rules for the AI Agentic Codex
 
-Don't modify the code inside old_code folder. old_code folder is the earlier implementation.
+- **Project naming and branding**
+  - I have not yet fully decided on the name of the Product. For now, it is "Namesmith"
+  - Use `namesmith` for variables and identifiers when a project name is required.
+  - For any user-facing text, reference a single global branding constant set to "Namesmith" so it can be changed in one place later.
 
-Use the latest most stable version of the softwares and tools. Don't be forced to use the version used in old_code folder implementation. That implementation is 1 year back, and can contain older version of softwares and tools.
+- **Legacy code policy**
+  - Treat `old_code/` as reference-only. Do not modify files inside `old_code/`.
+  - You may read `old_code/` to understand the prior implementation, but do not adopt outdated versions from it.
 
-Use pnpm as Node package manager. Use uv for python.
+- **Tools, versions, and package managers**
+  - Use the latest stable versions of software and libraries.
+  - Node.js: use `pnpm` for package management.
+  - Python: use `uv` for environment and dependency management.
 
-follow frontend rules from 5_frontend_design.md
+- **Frontend standards**
+  - Follow the frontend rules defined in `agentic_development_docs/project_design_plan/5_frontend_design.md`.
+
+- **LangChain documentation sources**
+  - Prefer the Context7 MCP server for the latest LangChain documentation.
+  - If unavailable, use:
+    - `agentic_development_docs/tools_documentation/langchain_full_doc.md`
+    - `agentic_development_docs/tools_documentation/langchain_llms_brief.md`
+
+- **Development communication and logging**
+  - For any communication or logging during development, write documents to `agentic_development_docs/agent_communication/`.
+  - Examples include: assumptions made during implementation, design notes, and future work ideas.
+
+- **Defaults and constraints**
+  - Default to modern, stable, well-supported stacks and patterns.
+  - Keep configuration and branding centralized and easily changeable via constants.
+  - Any deviation from these rules requires explicit approval.

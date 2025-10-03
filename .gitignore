@@ -1,0 +1,5 @@
+# Ignore large/auxiliary documentation files
+agentic_development_docs/tools_documentation/*.md
+
+# Ignore legacy code directory entirely
+old_code/
