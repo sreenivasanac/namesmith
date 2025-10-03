@@ -5,6 +5,10 @@
   - As far as possible, keep the development code simple and straight-forward.
   - You are an expert software engineer with 30 years of programming experience. Follow best programming practices.
   - If there are TODOs, add as comment in the same code file while you are implementing them.
+  - Go through the design plan in project_design_plan folder.
+[0_project_idea.md](agentic_development_docs/project_design_plan/0_project_idea.md) [0_implementation_plan.md](agentic_development_docs/project_design_plan/0_implementation_plan.md) [1_prd_architecture_overview.md](agentic_development_docs/project_design_plan/1_prd_architecture_overview.md) [2_db_model.md](agentic_development_docs/project_design_plan/2_db_model.md) [2_db_model_extended.md](agentic_development_docs/project_design_plan/2_db_model_extended.md) [3_prd_api_design_req.md](agentic_development_docs/project_design_plan/3_prd_api_design_req.md) [4_prd_agent_design.md](agentic_development_docs/project_design_plan/4_prd_agent_design.md) [5_security_testing_deployment.md](agentic_development_docs/project_design_plan/5_security_testing_deployment.md) 
+- If you think there are more useful rules you can add to this rules1.md file while you are implementing, then feel free to add those rules to this file.
+
 
 - **Project naming and branding**
   - I have not yet fully decided on the name of the Product. For now, it is "Namesmith"
@@ -29,8 +33,8 @@
   - Prefer the Context7 MCP server for the latest documentation for any of the tools, frameworks and packages that you want to use. 
   - For example, use context7 MCP server for LangChain documentation.
   - If unavailable, use:
-    - `agentic_development_docs/tools_documentation/langchain_full_doc.md`
-    - `agentic_development_docs/tools_documentation/langchain_llms_brief.md`
+    - `agentic_development_docs/tools_documentation/langgraph_full_documentation.md`
+    - `agentic_development_docs/tools_documentation/langgraph_brief_documentation.md`
 
 - **Development communication**
   - If you have any question about the implementation, which is an important one, then you can stop and ask me before continuing the implementation.
@@ -42,5 +46,5 @@
 - **Defaults and constraints**
   - Default to modern, stable, well-supported stacks and patterns.
   - Keep configuration and branding centralized and easily changeable via constants.
-  - Any deviation from these rules requires explicit approval.
+  - Any considerable deviation from these rules requires explicit approval.
 
