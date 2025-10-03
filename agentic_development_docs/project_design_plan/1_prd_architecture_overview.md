@@ -64,16 +64,19 @@ namesmith/
 ├─ apps/
 │  └─ web/                      # Next.js console (App Router)
 ├─ services/
-│  ├─ api/                      # FastAPI app (REST)
+│  ├─ api/                      # FastAPI app (REST) + Celery worker/beat entrypoints
+│  │  ├─ migrations/            # Alembic migrations (owned by API)
+│  │  └─ scripts/               # DB/ETL/seed scripts and one-offs
+│  │     └─ scrapers/           # Company-name ingestion (YC, Crunchbase, etc.)
 │  └─ agents/                   # LangGraph workflows, tools, runners
 ├─ packages/
 │  ├─ shared-ts/                # Shared TS types (client contracts)
 │  └─ shared-py/                # Shared Pydantic models, enums
 ├─ infra/
 │  ├─ docker/                   # Dockerfiles, compose, dev stacks
-│  ├─ migrations/               # Alembic migrations
 │  └─ ops/                      # Deployment IaC, env templates
-├─ project_development_plan/    # Specs, plans (this doc)
+├─ agentic_development_docs/
+│  └─ project_design_plan/      # Specs, plans (this doc)
 └─ old_code/                    # Frozen legacy reference (do not modify)
 ```
 

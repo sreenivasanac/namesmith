@@ -25,13 +25,13 @@ apps/
   web/
 services/
   api/
+    migrations/
   agents/
 packages/
   shared-ts/
   shared-py/
 infra/
   docker/
-  migrations/
   ops/
 project_development_plan/
 old_code/
