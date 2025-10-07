@@ -1,5 +1,6 @@
 ### Rules for the AI Agentic Codex
 
+
 - **Development implementation**
   - For this run, develop the major features only. Not the ones like debug logs using sentry, observability using langfuse. We will implement them later.
   - As far as possible, keep the development code simple and straight-forward.
@@ -48,3 +49,5 @@
   - Keep configuration and branding centralized and easily changeable via constants.
   - Any considerable deviation from these rules requires explicit approval.
 
+- **Final Important rules on completion**
+  - When you're done, self-critique your work until you're sure it's correct.

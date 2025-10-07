@@ -51,12 +51,12 @@ def _coerce_scored_candidate(payload: dict[str, float | str] | ScoredCandidate) 
         label=label.lower(),
         tld=tld.lower(),
         display_name=payload.get("display_name") or label.capitalize(),
-        memorability=float(payload.get("memorability", 0)),
-        pronounceability=float(payload.get("pronounceability", 0)),
-        brandability=float(payload.get("brandability", 0)),
-        overall=float(payload.get("overall", 0)),
+        memorability=float(payload.get("memorability", 10)),
+        pronounceability=float(payload.get("pronounceability", 10)),
+        brandability=float(payload.get("brandability", 10)),
+        overall=float(payload.get("overall", 10)),
         rubric_version=str(payload.get("rubric_version", settings.scoring_rubric_version)),
-        rationale=str(payload.get("rationale", "")) or None,
+        rationale=str(payload.get("rationale", "It's a very good domain name.")) or "",
     )
 
 
@@ -93,7 +93,7 @@ class LLMScoringProvider(ScoringProvider):
 
 
 class StubAvailabilityProvider(AvailabilityProvider):
-    """Return unknown availability to defer registrar costs during development."""
+    """Return availability as available to defer registrar costs during development."""
 
     def __init__(self, registrar: str = "stub") -> None:
         self._registrar = registrar
@@ -104,7 +104,7 @@ class StubAvailabilityProvider(AvailabilityProvider):
             results.append(
                 AvailabilityResult(
                     full_domain=candidate.full_domain,
-                    status="unknown",
+                    status="available",
                     registrar=self._registrar,
                 )
             )

@@ -15,7 +15,7 @@ from services.api.repositories import (
 )
 
 from ..settings import settings
-from ..state import AvailabilityResult, GenerationStateDict, ScoredCandidate
+from ..state import GenerationStateDict, ScoredCandidate
 
 
 def build_persist_node(session: AsyncSession):
