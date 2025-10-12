@@ -79,6 +79,7 @@ Deliverables:
   - Nodes: gather_trends, generate_names, dedupe_and_filter, score_names, availability_precheck, availability_verify, persist_results
   - Graph builder with subgraphs and checkpoint/persistence hooks
   - Provider abstraction for LLMs and registrar APIs
+  - LiteLLM-backed generation + scoring providers with per-job model selection and allowlist validation
 - Minimal in‑memory runner + Postgres persistence adapter
 
 Acceptance:

@@ -17,6 +17,7 @@ from ..dependencies import db_session
 from ..repositories import create_job, get_job, list_jobs, upsert_user
 from ..serializers import serialize_job
 from ...agents.executor import run_generation_job
+from ...agents.settings import settings as agent_settings
 from ...agents.state import GenerationInputs
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,13 @@ async def create_generation_job(
     session: AsyncSession = Depends(db_session),
     user: UserContext = Depends(get_current_user),
 ) -> JobResponse:
+    allowlist = agent_settings.model_allowlist
+    if allowlist:
+        if request.generation_model and request.generation_model not in allowlist:
+            raise HTTPException(status_code=400, detail="Requested generation model is not supported")
+        if request.scoring_model and request.scoring_model not in allowlist:
+            raise HTTPException(status_code=400, detail="Requested scoring model is not supported")
+
     if user.id is not None:
         await upsert_user(session, user_id=user.id, email=user.email or "unknown@example.com", role=user.role)
 
@@ -60,6 +68,8 @@ async def create_generation_job(
         categories=request.categories,
         tlds=request.tlds,
         count=request.count,
+        generation_model=request.generation_model,
+        scoring_model=request.scoring_model,
     )
 
     async def _run_job() -> None:

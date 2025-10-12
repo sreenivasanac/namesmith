@@ -9,8 +9,14 @@ Python backend services for the Namesmith multi-agent domain generation system.
    uv sync --dev
    ```
 2. Configure environment variables in `.env` (API) and `services/agents/.env` (agents). Minimum required variables:
-   ```env
+   ```env 
    DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/namesmith
+   ```
+   The LLM-backed generation and WhoAPI availability providers require:
+   ```env
+   OPENAI_API_KEY=sk-...
+   WHOAPI_API_KEY=your-whoapi-token
+   WHOISJSON_API_KEY=your-whoisjson-api-token
    ```
 3. Run the API locally:
    ```bash
@@ -40,5 +46,4 @@ uv run pytest
 ## TODO
 
 - Implement Supabase JWT verification for `Authorization` headers.
-- Replace the availability stub with the fully-functional WhoAPI integration once credentials are provisioned.
 - Wire Celery worker to execute long-running jobs outside the API process.

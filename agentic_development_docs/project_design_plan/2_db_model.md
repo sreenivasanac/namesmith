@@ -103,6 +103,7 @@ Indexes
 - Contracts: Pydantic models live in `packages/shared-py`; types in `packages/shared-ts` are generated/mirrored from OpenAPI/JSON Schema with CI parity checks.
 - Migrations: Alembic maintains schema evolution; Postgres hosted in Supabase.
 - Ownership: The Python API owns database access and migrations; the web app does not access the database directly.
+- Jobs table (when enabled) persists `generation_model` and `scoring_model` selections inside `jobs.params` for auditability and UI rendering.
 
 The following are extended ones:
 

@@ -8,6 +8,7 @@ dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
     "sqlalchemy>=2.0.30",
+    "greenlet>=3.0.0",
     "asyncpg>=0.29.0",
     "alembic>=1.13.2",
     "pydantic>=2.7.0",
@@ -18,7 +19,9 @@ dependencies = [
     "tenacity>=8.2.3",
     "python-multipart>=0.0.9",
     "redis>=5.0.4",
-    "celery>=5.3.6"
+    "celery>=5.3.6",
+    "openai>=1.35.0",
+    "litellm>=1.44.0"
 ]
 
 [project.optional-dependencies]
@@ -61,9 +64,3 @@ plugins = ["pydantic.mypy"]
 
 [tool.uv]
 package = true
-
-[tool.uv.scripts]
-api = "uvicorn services.api.main:app --reload"
-worker = "celery -A services.api.celery_app worker -Q default"
-beat = "celery -A services.api.celery_app beat"
-agent = "python -m services.agents.run_local"

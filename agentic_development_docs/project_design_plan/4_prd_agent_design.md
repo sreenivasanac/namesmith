@@ -3,7 +3,7 @@
 ## 6. Agents: LangGraph Design
 
 Graph (job execution paths):
-Entry A) 1.1) gather_trends (optional) →
+Entry A) 1.1) gather_trends (optional, TODO) →
 Entry B) 1.2) gather_similar_names (optional) →
 2) generate_names →
 3) dedupe_and_filter →
@@ -40,10 +40,10 @@ class GenerationState(BaseModel):
 
 Overview & Conventions
 - Runtime: Python LangGraph. All blocking work uses async I/O where applicable.
-- Orchestration: The API (FastAPI) creates a job and enqueues execution to Celery workers; the graph loads `GenerationState` and executes nodes. For small availability batches (≤ 50), the API may invoke availability checks synchronously without a Celery handoff.
+- Orchestration: The API (FastAPI) creates a job and, for now, schedules LangGraph execution in-process via `asyncio.create_task`; once long-running steps are added we will migrate to Celery workers. For small availability batches, the API is currently invoking availability checks synchronously without a Celery handoff. If Celery is required, we will move to Celery.
 <!-- - Checkpointing: After each major node boundary, the graph stores a checkpoint (Postgres-backed store) keyed by `job_id` and step name for resumability and idempotency.
 Observability: Each node logs to Langfuse with prompt/version (where applicable), step metrics, and error traces; progress counters update `jobs`/`agent_runs`. -->
- - Providers: LLM/registrar/Domain name availability checking API - abstracted behind provider interfaces; vendors API keys are fetched via env flags; registrar API calls are capped per job and rate-limited per provider.
+ - Providers: LLM/registrar/Domain name availability checking API - abstracted behind provider interfaces; vendors API keys are fetched via env flags; registrar API calls are capped per job and rate-limited per provider. Current implementation uses the placeholder context gatherer; investor-specific retrieval remains a TODO.
  <!-- LLM Vendors are rate-limited - to avoid huge bills. -->
  - User context: `user_id` is populated from Supabase JWT; used for quotas, provenance on `jobs.created_by`, and scoping of results visible in the Console.
 
@@ -56,11 +56,13 @@ Start Modes & Selection
    - If only investor research (no business prompt) → run `gather_trends`.
    - If both are present → run both and merge contexts (dedupe) before `generate_names`.
 
+> Current implementation prioritizes the Business flow; investor-specific retrieval will be enabled once trend datasets are ready.
+
 Node Details
 
 
 
-1.1) gather_trends (Path‑1 for domain name investors; optional in Entry A/B)
+1.1) gather_trends (Path‑1 for domain name investors; optional in Entry A/B, TODO)
 - Purpose: Retrieve list of topics, categories and trends to give as context to domain name generation step.
 - Inputs: `topic`, `categories`, optional investor prompt, and optionally prior `trends` in state (for retries/resumes).
 - Outputs: `trends: list[Trend]` (deduplicated, tagged, optionally embedded).
@@ -70,6 +72,7 @@ Node Details
   - Deduplicate by title/url hash; collapse near-duplicates. -->
   - No LLM calls here; purely retrieval/curation.
 - Failure handling: If unavailable, continue with empty `trends` and mark a soft warning (non-blocking).
+- Implementation status: currently stubbed by tokenizing the topic/prompt to generate placeholder trends.
 
 
 1.2) gather_similar_names (Path‑2 for businesses looking for names; prompt‑driven)
@@ -99,6 +102,7 @@ Node Details
 - Outputs: `candidates: list[Candidate]` size ≥ `requested × oversample_factor` (e.g., 2–3x for headroom).
 - Method:
   - Prompt LLM with structured instructions to avoid hyphens/numbers unless requested; encourage pronounceable, short, brandable labels; include rationale briefly.
+  - LiteLLM calls the selected `generation_model` supplied by the API/job, so swapping vendors only requires a model string change.
   - Context assembly: merge `trends` (Entry A) and `company_examples` + prompt (Entry B) into concise bullets for the system prompt; dedupe overlapping tags and keep within token budget.
   - Generate label-first; TLD assignment may happen later based on `tlds` preferences and validity rules.
   - Capture prompt version in Langfuse; tag with rubric and model info.
@@ -120,6 +124,7 @@ Failure handling: Retry with exponential backoff for transient errors; on persis
   <!-- - Profanity/reserved-word blacklist.
   - Basic topical relevance heuristics using `topic/categories` keywords. -->
 - Notes: No network I/O here; aim for fast, deterministic pruning. Track counts removed and reasons for telemetry.
+  Current implementation performs simple de-duplication by label; oversampling and near-duplicate pruning remain TODOs.
 
 Types (documentation)
 ```
@@ -133,7 +138,7 @@ class CompanyExample(BaseModel):
 ```
 
 4) score_names
-- Purpose: Assign quality scores per candidate using hybrid heuristics + LLM judge.
+- Purpose: Assign quality scores per candidate using an LLM judge.
 - Inputs: `filtered`.
 - Outputs: `scored` (each with component scores and an `overall_score`).
 <!-- - Heuristics:
@@ -142,13 +147,14 @@ class CompanyExample(BaseModel):
 - LLM judge:
   - Prompted to rate memorability, pronounceability, brandability, and overall_score considering everything; asks for short rationale.
   - Chain-of-thought disabled; rationale is concise and non-sensitive.
-  - Prompt/version tracked in Langfuse; sampling params pinned.
+  - Prompt/version tracking via Langfuse is deferred; sampling params remain pinned.
+  - LiteLLM routes scoring to the requested `scoring_model`, adhering to a JSON-only response contract for deterministic parsing with integer scores (1–10).
 - Aggregation: Compute `overall_score` (e.g., weighted mean) with rubric versioning.
 
 5) availability_precheck (cheap heuristics)
 - Purpose: Use DNS heuristics and negative cache to avoid unnecessary paid registrar checks.
 - Inputs: `scored` (or `filtered` if skipping scoring first).
-For now mark everything as 'unknown' and proceed to next step, later we can do this optimization.
+  For now this node is skipped; the graph proceeds directly to registrar checks. Track this as a TODO when availability heuristics are ready.
 <!-- - Outputs: Partial `availability` results with statuses `registered` or `unknown` (never `available` here).
 - Method:
   - Async DNS lookups for A/AAAA/CNAME, NS/SOA.
@@ -157,13 +163,13 @@ For now mark everything as 'unknown' and proceed to next step, later we can do t
   - Consult negative cache/TTL to skip recent `registered` results when allowed.
 - Limits: Concurrency caps per resolver; per-domain timeout; jittered retries for transient NXDOMAIN/timeout. -->
 
-6) availability_verify (registrar APIs)
+-6) availability_verify (registrar APIs)
 - Purpose: Confirm availability via registrar providers for domains with `unknown` status.
 - Inputs: Results from precheck.
 - Outputs: `availability` finalized statuses: `available | registered | error` with provider details.
-- Providers: Pluggable (whoisjsonapi primary; others optional via feature flags). All raw responses recorded for audit.
+- Providers: Pluggable (WhoisJSON primary; WhoAPI optional via feature flags). All raw responses recorded for audit.
 - Method:
-  - Call https://whoisjsonapi.com/v1/status - see domain_name_availability.py for how to call this API.
+  - Preferred integration: https://whoisjsonapi.com/v1/status (implementation: `services/agents/providers/whoisjson.py` ; Documentation `agentic_development_docs/tools_documentation/whoisjsonapi_documentation.md` for API documentation reference).
   - Batch requests when supported; respect vendor quotas and per-minute caps.
   - Retry strategy for 5xx/timeouts; circuit-breaker if sustained failure.
   - Map heterogeneous provider responses to standardized statuses.
@@ -198,21 +204,22 @@ Checkpointing & Resilience
 
 Configuration
 - Env flags: model/provider selection, concurrency caps, time budgets, rubric weights, availability thresholds, DNS timeouts.
+- Settings expose an optional LiteLLM model allowlist; API validation rejects requests outside this set and defaults fall back to configured generation/scoring models.
 - Feature flags: enable/disable `gather_trends`, choose registrar providers, toggle LLM judge.
 
 Observability & Metrics
-- Langfuse traces for each LLM/tool call; prompt/version tracking; link back to `agent_runs.trace_id`.
+- TODO: Integrate Langfuse traces for LLM/tool calls with prompt/version tracking linked to `agent_runs.trace_id`.
 - Metrics: counts (generated, filtered, scored, checked), latency per node, provider error rates, duplicate ratio.
-- Sentry: capture exceptions with job context; OTEL spans across API → worker → DB.
+- TODO: Enable Sentry and OTEL instrumentation across API → worker → DB.
 
 Security & Limits
 - Respect user quotas and org budgets enforced in API when creating jobs.
 - Vendor keys are read from environment; no secrets stored in state or logs.
 
 Testing & Evals
-- Unit tests for deterministic nodes (dedupe/filter, heuristics scoring).
+- Unit tests for deterministic nodes (dedupe/filter) and LLM provider integration stubs.
 - Recorded HTTP cassettes (VCR.py) for DNS/registrar interactions.
-- Golden set comparisons for LLM judge stability; prompt versioning in Langfuse.
+- Golden set comparisons for LLM judge stability; prompt versioning in Langfuse (TODO).
 
 Acceptance Criteria (Agent Flow)
 - Given a job with topic and TLDs, the graph generates candidates, dedupes/filters them, scores them, checks availability, persists results, and updates job status with observable traces, within configured budgets.

@@ -5,6 +5,8 @@ from ..state import CompanyExample, GenerationStateDict, Trend
 
 
 async def gather_context(state: GenerationStateDict) -> dict[str, list]:
+    # TODO(agents-context): replace placeholder token heuristics with real data sources for
+    # business and investor flows once datasets are wired up. See project docs for details.
     inputs = state["inputs"]
     topic_tokens = _tokenize(inputs.topic)
     prompt_tokens = _tokenize(inputs.prompt)

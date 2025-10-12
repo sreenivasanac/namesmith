@@ -1,11 +1,13 @@
 """Provider factories and exports."""
 from .base import AvailabilityProvider, GenerationProvider, ScoringProvider
-from .local import (
+from .llm import (
     LLMGenerationProvider,
     LLMScoringProvider,
     StubAvailabilityProvider,
     build_default_providers,
 )
+from .whoapi import WhoapiAvailabilityProvider
+from .whoisjson import WhoisJsonAvailabilityProvider
 
 __all__ = [
     "AvailabilityProvider",
@@ -15,4 +17,6 @@ __all__ = [
     "ScoringProvider",
     "StubAvailabilityProvider",
     "build_default_providers",
+    "WhoapiAvailabilityProvider",
+    "WhoisJsonAvailabilityProvider",
 ]

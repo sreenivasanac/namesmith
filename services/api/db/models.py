@@ -26,22 +26,26 @@ class DomainName(Base):
     agent_model: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    availability: Mapped["DomainAvailabilityStatus" | None] = relationship(
+    availability: Mapped[DomainAvailabilityStatus | None] = relationship(
         "DomainAvailabilityStatus", back_populates="domain", uselist=False
     )
-    evaluation: Mapped["DomainEvaluation" | None] = relationship(
+    evaluation: Mapped[DomainEvaluation | None] = relationship(
         "DomainEvaluation", back_populates="domain", uselist=False
     )
-    seo_analysis: Mapped["DomainSeoAnalysis" | None] = relationship(
+    seo_analysis: Mapped[DomainSeoAnalysis | None] = relationship(
         "DomainSeoAnalysis", back_populates="domain", uselist=False
     )
     availability_checks: Mapped[list["AvailabilityCheck"]] = relationship(
         "AvailabilityCheck", back_populates="domain"
     )
+    job_domain_links: Mapped[list["JobDomainLink"]] = relationship(
+        "JobDomainLink", back_populates="domain", overlaps="jobs,domains"
+    )
     jobs: Mapped[list["Job"]] = relationship(
         "Job",
         secondary="job_domain_links",
         back_populates="domains",
+        overlaps="job_domain_links",
     )
 
 
@@ -143,12 +147,16 @@ class Job(Base):
     error: Mapped[str | None] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    runs: Mapped[list["AgentRun"]] = relationship("AgentRun", back_populates="job")
-    created_by_user: Mapped["User" | None] = relationship("User", back_populates="jobs")
+    runs: Mapped[list[AgentRun]] = relationship("AgentRun", back_populates="job")
+    created_by_user: Mapped[User | None] = relationship("User", back_populates="jobs")
+    job_domain_links: Mapped[list["JobDomainLink"]] = relationship(
+        "JobDomainLink", back_populates="job", overlaps="jobs,domains"
+    )
     domains: Mapped[list[DomainName]] = relationship(
         DomainName,
         secondary="job_domain_links",
         back_populates="jobs",
+        overlaps="job_domain_links",
     )
 
 
@@ -193,8 +201,12 @@ class JobDomainLink(Base):
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    job: Mapped[Job] = relationship(Job, backref="job_domain_links")
-    domain: Mapped[DomainName] = relationship(DomainName, backref="job_domain_links")
+    job: Mapped[Job] = relationship(
+        Job, back_populates="job_domain_links", overlaps="domains,jobs"
+    )
+    domain: Mapped[DomainName] = relationship(
+        DomainName, back_populates="job_domain_links", overlaps="domains,jobs"
+    )
 
 
 __all__ = [

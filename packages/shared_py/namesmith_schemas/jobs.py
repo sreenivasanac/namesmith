@@ -17,6 +17,8 @@ class JobCreateRequest(NamesmithModel):
     categories: list[str] = Field(default_factory=list)
     tlds: list[str] = Field(default_factory=list)
     count: int = Field(default=20, ge=1, le=200)
+    generation_model: Optional[str] = None
+    scoring_model: Optional[str] = None
 
 
 class JobResponse(NamesmithModel):
@@ -28,6 +30,8 @@ class JobResponse(NamesmithModel):
     finished_at: Optional[datetime] = None
     error: Optional[str] = None
     progress: Optional[dict[str, Any]] = None
+    generation_model: Optional[str] = None
+    scoring_model: Optional[str] = None
 
 
 class JobListResponse(NamesmithModel):

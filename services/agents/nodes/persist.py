@@ -1,6 +1,7 @@
 """Persistence node that writes agent outputs to the database."""
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Iterable
 
@@ -20,8 +21,11 @@ from ..state import GenerationStateDict, ScoredCandidate
 
 def build_persist_node(session: AsyncSession):
     async def _persist(state: GenerationStateDict) -> dict[str, list[str]]:
-        job_id = state["inputs"].job_id
-        agent_name = settings.generation_model
+        inputs = state["inputs"]
+        job_id = inputs.job_id
+        generation_model = inputs.generation_model or settings.generation_model
+        scoring_model = inputs.scoring_model or settings.scoring_model
+        agent_name = f"{settings.branding_name}-generation"
         timestamp = datetime.utcnow()
 
         scored: Iterable[ScoredCandidate] = state.get("scored") or state.get("filtered") or []
@@ -36,8 +40,8 @@ def build_persist_node(session: AsyncSession):
                 label=candidate.label,
                 tld=candidate.tld,
                 display_name=candidate.display_name,
-                processed_by_agent=settings.generation_model,
-                agent_model=settings.generation_model,
+                processed_by_agent=agent_name,
+                agent_model=generation_model,
             )
             availability = availability_map.get(candidate.full_domain)
             if availability:
@@ -45,11 +49,11 @@ def build_persist_node(session: AsyncSession):
                     session,
                     domain_id=domain.id,
                     status=availability.status,
-                    processed_by_agent=settings.generation_model,
-                    agent_model=settings.generation_model,
+                    processed_by_agent=f"{settings.branding_name}-availability",
+                    agent_model=generation_model,
                     registrar=availability.registrar,
                     method="registrar",
-                    raw_payload=None,
+                    raw_payload=availability.raw_payload,
                     ttl_sec=None,
                 )
             await upsert_evaluation(
@@ -57,13 +61,13 @@ def build_persist_node(session: AsyncSession):
                 domain_id=domain.id,
                 possible_categories=[],
                 possible_keywords=[],
-                memorability_score=int(round(candidate.memorability)),
-                pronounceability_score=int(round(candidate.pronounceability)),
-                brandability_score=int(round(candidate.brandability)),
-                overall_score=int(round(candidate.overall)),
-                description=candidate.rationale or "Generated via heuristic scoring.",
-                processed_by_agent=settings.generation_model,
-                agent_model=settings.generation_model,
+                memorability_score=candidate.memorability,
+                pronounceability_score=candidate.pronounceability,
+                brandability_score=candidate.brandability,
+                overall_score=candidate.overall,
+                description=candidate.rationale or "Generated via LLM scoring.",
+                processed_by_agent=f"{settings.branding_name}-scoring",
+                agent_model=scoring_model,
             )
             domain_ids.append(str(domain.id))
             await link_domain_to_job(session, job_id=job_id, domain_id=domain.id)
@@ -73,9 +77,11 @@ def build_persist_node(session: AsyncSession):
             job_id=job_id,
             agent_name=agent_name,
             status="succeeded",
-            input_payload=state["inputs"].model_dump(),
+            input_payload=json.loads(state["inputs"].model_dump_json()),
             output_payload={
                 "count": len(domain_ids),
+                "generation_model": generation_model,
+                "scoring_model": scoring_model,
             },
             started_at=timestamp,
             finished_at=datetime.utcnow(),

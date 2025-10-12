@@ -52,6 +52,7 @@ class AvailabilityResult(BaseModel):
     status: Literal["available", "registered", "unknown", "error"]
     registrar: Optional[str] = None
     checked_at: datetime = Field(default_factory=datetime.utcnow)
+    raw_payload: Optional[dict] = None
 
 
 class GenerationInputs(BaseModel):
@@ -63,6 +64,8 @@ class GenerationInputs(BaseModel):
     categories: list[str] = Field(default_factory=list)
     tlds: list[str] = Field(default_factory=list)
     count: int = 20
+    generation_model: Optional[str] = None
+    scoring_model: Optional[str] = None
 
 
 class GenerationState(BaseModel):

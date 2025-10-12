@@ -77,6 +77,7 @@ def serialize_domain(domain: DomainName) -> Domain:
 
 
 def serialize_job(job: Job, progress: dict[str, int] | None = None) -> JobResponse:
+    params = job.params or {}
     return JobResponse.model_validate(
         {
             "id": job.id,
@@ -87,5 +88,7 @@ def serialize_job(job: Job, progress: dict[str, int] | None = None) -> JobRespon
             "finished_at": job.finished_at,
             "error": job.error,
             "progress": progress or {},
+            "generation_model": params.get("generation_model"),
+            "scoring_model": params.get("scoring_model"),
         }
     )

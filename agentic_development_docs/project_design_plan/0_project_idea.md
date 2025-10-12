@@ -47,6 +47,7 @@ Entry B (Businesses): Prompt-driven Context + Similar Names
 2. Domain Name Generation
     * Bot-2 generates creative and brandable domain names
     * Uses detailed prompts, categories/keywords, trends and examples
+    * Users can select which LLM model powers each generation run
 3. Dedupe and Filtering
     * Remove near-duplicates, enforce constraints (length, style, restricted patterns)
 4. Scoring of Generated Domain Names
@@ -56,6 +57,7 @@ Entry B (Businesses): Prompt-driven Context + Similar Names
         * Length
         * Brandability
     * Hybrid approach: heuristics + LLM judge with clear rubric
+    * Scoring model choice is user-configurable per job
 5. Domain Name Availability Verification
     * For now: verify via registrar API (WhoAPI) directly
     * Future: add DNS heuristics and negative cache to minimize paid checks

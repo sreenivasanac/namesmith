@@ -8,6 +8,9 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+DEFAULT_ASYNC_PG_STATEMENT_CACHE_SIZE = 0
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -16,9 +19,12 @@ class Settings(BaseSettings):
     default_tld: list[str] = Field(default_factory=lambda: ["com", "ai"])
     branding_name: str = Field(default="Namesmith")
     agent_model_name: str = Field(default="namesmith-agent")
-    registrar_provider: str = Field(default="whoapi")
-    registrar_api_key: Optional[str] = Field(default=None, alias="WHOAPI_API_KEY")
+    registrar_provider: str = Field(default="whoisjson")
+    registrar_api_key: Optional[str] = Field(default=None, alias="WHOISJSON_API_KEY")
     openai_api_key: Optional[str] = Field(default=None, alias="OPENAI_API_KEY")
+    asyncpg_statement_cache_size: int = Field(
+        default=DEFAULT_ASYNC_PG_STATEMENT_CACHE_SIZE, alias="ASYNC_PG_STATEMENT_CACHE_SIZE"
+    )
 
 
 

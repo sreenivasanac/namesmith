@@ -15,10 +15,13 @@ class AgentSettings(BaseSettings):
 
     database_url: str = Field(alias="DATABASE_URL")
     branding_name: str = Field(default="Namesmith")
-    generation_model: str = Field(default="local-heuristic")
+    generation_model: str = Field(default="gpt-4o-mini")
+    scoring_model: str = Field(default="gpt-4o-mini")
+    model_allowlist: list[str] = Field(default_factory=list)
     scoring_rubric_version: str = Field(default="v1")
-    registrar_provider: str = Field(default="stub")
+    registrar_provider: str = Field(default="whoisjson")
     whoapi_api_key: Optional[str] = Field(default=None, alias="WHOAPI_API_KEY")
+    whoisjson_api_key: Optional[str] = Field(default=None, alias="WHOISJSON_API_KEY")
     openai_api_key: Optional[str] = Field(default=None, alias="OPENAI_API_KEY")
 
 

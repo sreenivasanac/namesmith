@@ -8,6 +8,7 @@
   - If there are TODOs, add as comment in the same code file while you are implementing them.
   - Go through the design plan in project_design_plan folder.
 [0_project_idea.md](agentic_development_docs/project_design_plan/0_project_idea.md) [0_implementation_plan.md](agentic_development_docs/project_design_plan/0_implementation_plan.md) [1_prd_architecture_overview.md](agentic_development_docs/project_design_plan/1_prd_architecture_overview.md) [2_db_model.md](agentic_development_docs/project_design_plan/2_db_model.md) [2_db_model_extended.md](agentic_development_docs/project_design_plan/2_db_model_extended.md) [3_prd_api_design_req.md](agentic_development_docs/project_design_plan/3_prd_api_design_req.md) [4_prd_agent_design.md](agentic_development_docs/project_design_plan/4_prd_agent_design.md) [5_security_testing_deployment.md](agentic_development_docs/project_design_plan/5_security_testing_deployment.md) 
+- If you have made implementation changes, update them back to the relavant project design plan files above.
 - If you think there are more useful rules you can add to this rules1.md file while you are implementing, then feel free to add those rules to this file.
 
 
@@ -36,6 +37,7 @@
   - If unavailable, use:
     - `agentic_development_docs/tools_documentation/langgraph_full_documentation.md`
     - `agentic_development_docs/tools_documentation/langgraph_brief_documentation.md`
+  - For LiteLLM documentation, the documentation is available here:  `https://docs.litellm.ai/docs/`
 
 - **Development communication**
   - If you have any question about the implementation, which is an important one, then you can stop and ask me before continuing the implementation.

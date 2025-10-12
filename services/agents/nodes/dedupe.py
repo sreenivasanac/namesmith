@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from ..state import Candidate, GenerationStateDict
 
-_ALLOWED_LENGTH_RANGE = (4, 12)
+_ALLOWED_LENGTH_RANGE = (4, 15)
 
 
 def dedupe_and_filter(state: GenerationStateDict) -> dict[str, list[Candidate]]:
