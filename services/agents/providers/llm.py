@@ -61,14 +61,34 @@ def _coerce_scored_candidate(payload: dict[str, float | str] | ScoredCandidate) 
     if len(rationale) > 200:
         rationale = rationale[:200]
 
+    memorability = _as_score(payload.get("memorability"))
+    pronounceability = _as_score(payload.get("pronounceability"))
+    brandability = _as_score(payload.get("brandability"))
+    overall_raw = payload.get("overall")
+
+    if overall_raw is None:
+        weights = settings.scoring_rubric_weights or {}
+        total_weight = sum(weights.values())
+        if total_weight > 0:
+            weighted_sum = (
+                memorability * weights.get("memorability", 0)
+                + pronounceability * weights.get("pronounceability", 0)
+                + brandability * weights.get("brandability", 0)
+            )
+            overall_score = _as_score(weighted_sum / total_weight)
+        else:
+            overall_score = _as_score((memorability + pronounceability + brandability) / 3)
+    else:
+        overall_score = _as_score(overall_raw)
+
     return ScoredCandidate(
         label=label.lower(),
         tld=tld.lower(),
         display_name=payload.get("display_name") or label.capitalize(),
-        memorability=_as_score(payload.get("memorability")),
-        pronounceability=_as_score(payload.get("pronounceability")),
-        brandability=_as_score(payload.get("brandability")),
-        overall=_as_score(payload.get("overall")),
+        memorability=memorability,
+        pronounceability=pronounceability,
+        brandability=brandability,
+        overall=overall_score,
         rubric_version=str(payload.get("rubric_version", settings.scoring_rubric_version)),
         rationale=rationale,
     )
@@ -179,12 +199,18 @@ def build_default_providers(
         if not settings.whoapi_api_key:
             availability = StubAvailabilityProvider(registrar="whoapi-missing-key")
         else:
-            availability = WhoapiAvailabilityProvider(api_key=settings.whoapi_api_key)
+            availability = WhoapiAvailabilityProvider(
+                api_key=settings.whoapi_api_key,
+                timeout=settings.dns_timeout_seconds,
+            )
     elif provider_name in {"whoisjson", "whoisjsonapi"}:
         if not settings.whoisjson_api_key:
             availability = StubAvailabilityProvider(registrar="whoisjson-missing-key")
         else:
-            availability = WhoisJsonAvailabilityProvider(api_key=settings.whoisjson_api_key)
+            availability = WhoisJsonAvailabilityProvider(
+                api_key=settings.whoisjson_api_key,
+                timeout=settings.dns_timeout_seconds,
+            )
     else:
         raise ValueError(f"Unsupported registrar provider '{settings.registrar_provider}'")
 

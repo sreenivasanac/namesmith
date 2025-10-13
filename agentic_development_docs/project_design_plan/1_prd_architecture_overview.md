@@ -86,7 +86,6 @@ Naming rule from rules1.md: use `namesmith` for code identifiers; keep display t
 
 
 Key design points:
-- Use LangGraph subgraphs to isolate `score_names` and `availability` branches; run in parallel where safe
 - Persist checkpoints to Postgres (via a simple CheckpointStore) for resumability
 - Tool nodes for DNS check, registrar clients, embeddings, and prompt calls
 - Retries with exponential backoff and vendor‑specific rate limiting

@@ -5,6 +5,7 @@ from typing import Iterable, Sequence
 
 import httpx
 
+from ..settings import settings
 from ..state import AvailabilityResult, Candidate, ScoredCandidate
 from .base import AvailabilityProvider
 
@@ -19,11 +20,11 @@ class WhoisJsonAvailabilityProvider(AvailabilityProvider):
         api_key: str,
         *,
         base_url: str = "https://whoisjsonapi.com/v1/",
-        timeout: float = 10.0,
+        timeout: float | None = None,
     ) -> None:
         self._api_key = api_key
         self._base_url = base_url.rstrip("/") + "/"
-        self._timeout = timeout
+        self._timeout = timeout or settings.dns_timeout_seconds
 
     async def check(self, candidates: Iterable[Candidate | ScoredCandidate]) -> Sequence[AvailabilityResult]:
         results: list[AvailabilityResult] = []
