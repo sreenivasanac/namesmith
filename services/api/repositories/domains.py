@@ -3,12 +3,12 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Iterable
+from typing import Iterable, Sequence
 
-from sqlalchemy import Select, func, select
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import Select, and_, func, or_, select
+from sqlalchemy.dialects.postgresql import array, insert
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import aliased, selectinload
 
 from ..db.models import (
     AvailabilityCheck,
@@ -187,7 +187,21 @@ async def list_domains(
     *,
     limit: int,
     cursor: datetime | None,
+    search: str | None = None,
+    statuses: Sequence[str] | None = None,
+    tlds: Sequence[str] | None = None,
+    agent_models: Sequence[str] | None = None,
+    categories: Sequence[str] | None = None,
+    job_id: uuid.UUID | None = None,
+    score_ranges: dict[str, tuple[int | None, int | None]] | None = None,
+    sort_by: str = "created_at",
+    sort_dir: str = "desc",
 ) -> list[DomainName]:
+    availability_alias = aliased(DomainAvailabilityStatus)
+    evaluation_alias = aliased(DomainEvaluation)
+    job_link_alias = aliased(JobDomainLink)
+    seo_alias = aliased(DomainSeoAnalysis)
+
     stmt: Select[tuple[DomainName]] = (
         select(DomainName)
         .options(
@@ -195,10 +209,93 @@ async def list_domains(
             selectinload(DomainName.evaluation),
             selectinload(DomainName.seo_analysis),
         )
-        .order_by(DomainName.created_at.desc())
-        .limit(limit)
+        .outerjoin(availability_alias, DomainName.id == availability_alias.domain_id)
+        .outerjoin(evaluation_alias, DomainName.id == evaluation_alias.domain_id)
+        .outerjoin(job_link_alias, DomainName.id == job_link_alias.domain_id)
+        .outerjoin(seo_alias, DomainName.id == seo_alias.domain_id)
     )
+
+    filters: list = []
+
+    if search:
+        pattern = f"%{search.lower()}%"
+        full_domain_expr = func.concat_ws(".", DomainName.label, DomainName.tld)
+        filters.append(
+            or_(
+                func.lower(DomainName.label).like(pattern),
+                func.lower(DomainName.display_name).like(pattern),
+                func.lower(full_domain_expr).like(pattern),
+            )
+        )
+
+    if statuses:
+        status_values = [status.lower() for status in statuses if status]
+        if status_values:
+            filters.append(availability_alias.status.in_(status_values))
+
+    if tlds:
+        filters.append(func.lower(DomainName.tld).in_([t.lower() for t in tlds]))
+
+    if agent_models:
+        filters.append(DomainName.agent_model.in_(agent_models))
+
+    if categories:
+        filters.append(evaluation_alias.possible_categories.op("&&")(array(categories)))
+
+    if job_id:
+        filters.append(job_link_alias.job_id == job_id)
+
+    score_mapping = {
+        "memorability": evaluation_alias.memorability_score,
+        "pronounceability": evaluation_alias.pronounceability_score,
+        "brandability": evaluation_alias.brandability_score,
+        "overall": evaluation_alias.overall_score,
+        "seo_keyword_relevance": seo_alias.seo_keyword_relevance_score,
+    }
+    if score_ranges:
+        for key, column in score_mapping.items():
+            min_val, max_val = score_ranges.get(key, (None, None)) if score_ranges else (None, None)
+            if min_val is not None:
+                filters.append(column >= int(min_val))
+            if max_val is not None:
+                filters.append(column <= int(max_val))
+
+    if filters:
+        stmt = stmt.where(and_(*filters))
+
+    order_column = DomainName.created_at
+    if sort_by == "label":
+        order_column = DomainName.label
+    elif sort_by == "overall_score":
+        order_column = evaluation_alias.overall_score
+
+    order_direction = order_column.desc() if sort_dir.lower() == "desc" else order_column.asc()
+    
     if cursor is not None:
         stmt = stmt.where(DomainName.created_at < cursor)
+
+    stmt = stmt.distinct(DomainName.id).order_by(DomainName.id, order_direction, DomainName.created_at.desc()).limit(limit)
+
     result = await session.execute(stmt)
-    return list(result.scalars().all())
+    return list(result.scalars().unique().all())
+
+
+async def get_domain_filters_metadata(session: AsyncSession) -> dict[str, list[str]]:
+    statuses_stmt = select(func.distinct(DomainAvailabilityStatus.status)).where(DomainAvailabilityStatus.status.isnot(None))
+    tld_stmt = select(func.distinct(DomainName.tld)).where(DomainName.tld.isnot(None))
+    agent_models_stmt = select(func.distinct(DomainName.agent_model)).where(DomainName.agent_model.isnot(None))
+    industries_stmt = select(func.distinct(func.unnest(DomainEvaluation.possible_categories))).where(
+        DomainEvaluation.possible_categories.isnot(None)
+    )
+
+    statuses = [row[0] for row in (await session.execute(statuses_stmt)).all() if row[0]]
+    tlds = [row[0] for row in (await session.execute(tld_stmt)).all() if row[0]]
+    agent_models = [row[0] for row in (await session.execute(agent_models_stmt)).all() if row[0]]
+    industries = [row[0] for row in (await session.execute(industries_stmt)).all() if row[0]]
+
+    return {
+        "statuses": sorted(set(statuses)),
+        "tlds": sorted(set(tlds)),
+        "agent_models": sorted(set(agent_models)),
+        "industries": sorted({value.lower(): value for value in industries}.values()),
+    }

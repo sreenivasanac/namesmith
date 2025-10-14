@@ -1,6 +1,7 @@
 """Repository exports for Namesmith services."""
 from .domains import (
     get_domain_by_id,
+    get_domain_filters_metadata,
     list_domains,
     normalize_label,
     upsert_availability,
@@ -14,6 +15,7 @@ from .users import get_user_by_id, upsert_user
 __all__ = [
     "create_job",
     "get_domain_by_id",
+    "get_domain_filters_metadata",
     "get_job",
     "get_user_by_id",
     "list_domains",

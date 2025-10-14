@@ -23,17 +23,15 @@ async def get_current_user(authorization: Optional[str] = Header(default=None)) 
     TODO: Replace with Supabase JWT verification using the public key.
     """
     if not authorization:
-        # Allow anonymous access for development flows; tighten once Supabase JWT is wired.
         return UserContext(role="viewer")
 
     match = _SUPABASE_JWT_BEARER_PATTERN.match(authorization.strip())
     if not match:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authorization header")
+        return UserContext(role="viewer")
 
     token = match.group("token")
     try:
         user_id = uuid.UUID(token.split(".")[0])
-    except (ValueError, IndexError) as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from exc
-
-    return UserContext(id=user_id, role="editor")
+        return UserContext(id=user_id, role="editor")
+    except (ValueError, IndexError):
+        return UserContext(role="viewer")
