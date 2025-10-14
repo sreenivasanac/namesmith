@@ -13,6 +13,30 @@ Entry B) 1.2) gather_similar_names (optional) →
 7) persist_results →
 8) notify_human (optional)
 
+### LangGraph stateflow (current implementation)
+
+```mermaid
+flowchart LR
+  %% Executor builds providers and the graph, then invokes it with GenerationStateDict
+  subgraph Executor
+    EXE[run_generation_job]
+    PROV[Resolve models → build providers]
+    BUILD[build_generation_graph]
+    EXE --> PROV --> BUILD
+  end
+
+  subgraph "LangGraph: Generation Pipeline"
+    GC["gather_context\n(writes: trends, company_examples)"] -->
+    GEN["generate\n(writes: candidates)"] -->
+    DED["dedupe\n(writes: filtered)"] -->
+    SCO["score\n(writes: scored)"] -->
+    AV["availability\n(writes: availability)"] -->
+    PER["persist\n(DB writes, updates progress)"] --> END((END))
+  end
+
+  EXE --> GC
+```
+
 State schema (typed Pydantic):
 ```
 class GenerationState(BaseModel):
@@ -43,7 +67,7 @@ Overview & Conventions
 - Orchestration: The API (FastAPI) creates a job and, for now, schedules LangGraph execution in-process via `asyncio.create_task`; once long-running steps are added we will migrate to Celery workers. For small availability batches, the API is currently invoking availability checks synchronously without a Celery handoff. If Celery is required, we will move to Celery.
 <!-- - Checkpointing: After each major node boundary, the graph stores a checkpoint (Postgres-backed store) keyed by `job_id` and step name for resumability and idempotency.
 Observability: Each node logs to Langfuse with prompt/version (where applicable), step metrics, and error traces; progress counters update `jobs`/`agent_runs`. (Not implemented, maybe can consider later.) -->
- - Providers: LLM/registrar/Domain name availability checking API - abstracted behind provider interfaces; vendors API keys are fetched via env flags; registrar API calls are capped per job and rate-limited per provider. WhoisJSON is the preferred registrar integration, WhoAPI is an opt-in alternative, and if neither registrar credential is configured the graph falls back to the probabilistic stub provider. Current implementation uses the placeholder context gatherer; investor-specific retrieval remains a TODO.
+ - Providers: LLM/registrar/Domain name availability checking API - abstracted behind provider interfaces; vendors API keys are fetched via env flags; registrar API calls are capped per job and rate-limited per provider. WhoisJSON is the preferred registrar integration, WhoAPI is an opt-in alternative, and if neither registrar credential is configured the graph falls back to the probabilistic stub provider. Current implementation returns empty context from `gather_context`; investor-specific retrieval remains a TODO.
  <!-- LLM Vendors are rate-limited - to avoid huge bills. -->
  - User context: `user_id` is populated from Supabase JWT; used for quotas, provenance on `jobs.created_by`, and scoping of results visible in the Console.
 
@@ -71,13 +95,14 @@ Node Details
   <!-- - Time budget per job; respect `limit` and `source` feature flags.
   - Deduplicate by title/url hash; collapse near-duplicates. -->
 - Failure handling: If unavailable, continue with empty `trends` and mark a soft warning (non-blocking).
-- Implementation status: currently stubbed by tokenizing the topic/prompt to generate placeholder trends.
+- Implementation status: currently returns an empty trends list until real data sources are wired up.
 
 
 1.2) gather_similar_names (Path‑2 for businesses looking for names; prompt‑driven)
 - Purpose: Retrieve examples of similar businesses and their names to ground generation in the user’s brief (domain, category, target audience, tone).
 - Inputs: Business prompt (idea/use case, constraints like tone/length/keywords/TLDs), optional `topic/categories`.
 - Outputs: `company_examples: list[CompanyExample]` and `derived_categories/tags` to inform prompts.
+- Implementation status: currently returns an empty company_examples list until data sources are implemented.
 - Data sources:
   - `company_names` table populated via scraping (e.g., YC lists, Crunchbase summaries, other directories). Each row ideally has: company_name, domain, description, categories/tags, source, and optional embeddings.
   - When available, embeddings enable semantic similarity; otherwise, keyword/category matching is used.

@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import TypedDict
 
 from packages.shared_py.namesmith_schemas.base import EntryPath
@@ -37,6 +37,14 @@ class Candidate(BaseModel):
     def full_domain(self) -> str:
         return f"{self.label.lower()}.{self.tld.lower()}"
 
+    @model_validator(mode="after")
+    def _normalize(self) -> "Candidate":
+        self.label = (self.label or "").lower()
+        self.tld = (self.tld or "").lower()
+        if not self.display_name and self.label:
+            self.display_name = self.label.capitalize()
+        return self
+
 
 class ScoredCandidate(Candidate):
     memorability: float
@@ -45,6 +53,27 @@ class ScoredCandidate(Candidate):
     overall: float
     rubric_version: str = "v1"
     rationale: Optional[str] = None
+
+    @field_validator("memorability", "pronounceability", "brandability", "overall")
+    @classmethod
+    def _clamp_scores(cls, v: float) -> float:
+        try:
+            v = float(v)
+        except (TypeError, ValueError):
+            v = 10.0
+        if v < 1:
+            return 1.0
+        if v > 10:
+            return 10.0
+        return float(int(round(v)))
+
+    @field_validator("rationale")
+    @classmethod
+    def _trim_rationale(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        s = str(v).strip()
+        return s[:200] if len(s) > 200 else s
 
 
 class AvailabilityResult(BaseModel):

@@ -38,7 +38,8 @@ def build_generation_messages(
         - tld: TLD (default to popular choices if unspecified)
         - display_name: human-friendly capitalization of the label
         - reasoning: short phrase (<20 words) explaining the name
-        Reply with a pure JSON array containing between 10 and 25 objects. No prose, no code fences.
+        Respond with a pure JSON object of the form: {"items": [ ... ]}, where items is an array of objects.
+        No prose, no code fences.
         """
     ).strip()
 
@@ -71,7 +72,7 @@ def build_scoring_messages(candidates: Sequence[Candidate]) -> list[dict[str, st
     system_instructions = dedent(
         """
         You are evaluating candidate brand names. Score each according to the rubric below.
-        Return a JSON array where every object includes:
+        Return a JSON object {"items": [ ... ]} where each item includes:
         - label (lowercase)
         - tld
         - display_name (optional)
@@ -80,7 +81,7 @@ def build_scoring_messages(candidates: Sequence[Candidate]) -> list[dict[str, st
         - brandability (integer 1-10)
         - overall (integer 1-10)
         - rationale (max 25 words)
-        Output JSON only, use integer scores, no commentary or code fences.
+        Output JSON only, no commentary or code fences.
         """
     ).strip()
 
@@ -106,8 +107,10 @@ def extract_json_payload(content: str) -> Any:
 
 
 def parse_generation_payload(payload: Any) -> Sequence[dict[str, str]]:
+    if isinstance(payload, dict) and isinstance(payload.get("items"), list):
+        payload = payload["items"]
     if not isinstance(payload, list):
-        raise ValueError("Generation response must be a JSON array")
+        raise ValueError("Generation response must be a JSON array or an object with 'items' array")
     results: list[dict[str, str]] = []
     for item in payload:
         if not isinstance(item, dict):
@@ -117,8 +120,10 @@ def parse_generation_payload(payload: Any) -> Sequence[dict[str, str]]:
 
 
 def parse_scoring_payload(payload: Any) -> Sequence[dict[str, Any]]:
+    if isinstance(payload, dict) and isinstance(payload.get("items"), list):
+        payload = payload["items"]
     if not isinstance(payload, list):
-        raise ValueError("Scoring response must be a JSON array")
+        raise ValueError("Scoring response must be a JSON array or an object with 'items' array")
     results: list[dict[str, Any]] = []
     for item in payload:
         if not isinstance(item, dict):

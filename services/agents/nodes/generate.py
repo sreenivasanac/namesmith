@@ -15,6 +15,8 @@ def build_generate_node(provider: GenerationProvider):
             trends=state.get("trends", []),
             company_examples=state.get("company_examples", []),
         )
+        # TODO think if this step needs to be async or sync
+        # based on running time
         timeout = settings.generation_time_budget_seconds
         if timeout and timeout > 0:
             candidates = await asyncio.wait_for(coro, timeout=timeout)

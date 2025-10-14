@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, ClassVar, Optional, Union
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from .base import AvailabilityStatus, EntryPath, JobStatus, JobType, NamesmithModel
 
@@ -39,9 +39,53 @@ class JobListResponse(NamesmithModel):
     next_cursor: Optional[str] = None
 
 
+class DomainLookupBase(NamesmithModel):
+    model_config = NamesmithModel.model_config | {"extra": "forbid"}
+    _required_keys: ClassVar[set[str]] = set()
+    _allowed_keys: ClassVar[set[str]] = set()
+
+    @model_validator(mode="before")
+    @classmethod
+    def _validate_key_set(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        keys = {key for key, value in data.items() if value is not None}
+        missing = cls._required_keys - keys
+        if missing:
+            raise ValueError(f"Missing required fields: {', '.join(sorted(missing))}")
+        extras = keys - cls._allowed_keys
+        if extras:
+            raise ValueError(f"Unexpected fields: {', '.join(sorted(extras))}")
+        return data
+
+
+class DomainLookupById(DomainLookupBase):
+    _required_keys: ClassVar[set[str]] = {"id"}
+    _allowed_keys: ClassVar[set[str]] = {"id"}
+
+    id: UUID
+
+
+class DomainLookupByFullDomain(DomainLookupBase):
+    _required_keys: ClassVar[set[str]] = {"full_domain"}
+    _allowed_keys: ClassVar[set[str]] = {"full_domain"}
+
+    full_domain: str
+
+
+class DomainLookupByLabelTld(DomainLookupBase):
+    _required_keys: ClassVar[set[str]] = {"label", "tld"}
+    _allowed_keys: ClassVar[set[str]] = {"label", "tld"}
+
+    label: str
+    tld: str
+
+
+DomainLookup = Union[DomainLookupById, DomainLookupByFullDomain, DomainLookupByLabelTld]
+
+
 class AvailabilityCheckRequest(NamesmithModel):
-    domains: list[dict[str, str]]
-    mode: Optional[str] = Field(default="auto")
+    domains: list[DomainLookup]
 
 
 class AvailabilityCheckResult(NamesmithModel):

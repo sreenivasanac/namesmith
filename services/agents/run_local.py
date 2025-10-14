@@ -4,6 +4,10 @@ from __future__ import annotations
 import argparse
 import asyncio
 import uuid
+import logging
+# Change this to logging.INFO if you want to see the progress
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 from packages.shared_py.namesmith_schemas.base import EntryPath
 
@@ -53,7 +57,16 @@ async def _main() -> None:
     )
     args = parser.parse_args()
 
+    logger.info(
+        "Starting local generation job topic=%s tlds=%s count=%d gen_model=%s score_model=%s",
+        args.topic,
+        args.tlds,
+        args.count,
+        args.generation_model,
+        args.scoring_model,
+    )
     job_id = await _create_job_record(args)
+    logger.info("Created job record id=%s", job_id)
     entry_path = EntryPath(args.entry_path)
     inputs = GenerationInputs(
         job_id=job_id,
@@ -67,11 +80,11 @@ async def _main() -> None:
     result = await run_generation_job(inputs)
 
     availability_map = {item.full_domain: item for item in result.availability}
-    print(f"Generated {len(result.scored)} candidates for job {job_id}")
+    logger.info("Generated %d candidates for job %s", len(result.scored), job_id)
     for candidate in result.scored:
         availability = availability_map.get(candidate.full_domain)
         availability_status = availability.status if availability else "unknown"
-        print(f"- {candidate.full_domain} | score={candidate.overall} | availability={availability_status}")
+        logger.info("%s | score=%s | availability=%s", candidate.full_domain, candidate.overall, availability_status)
 
 
 if __name__ == "__main__":

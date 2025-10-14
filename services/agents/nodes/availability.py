@@ -10,6 +10,7 @@ from ..state import AvailabilityResult, GenerationStateDict
 
 def build_availability_node(provider: AvailabilityProvider):
     async def _availability(state: GenerationStateDict) -> dict[str, list[AvailabilityResult]]:
+        # TODO check if this is how state object should store, or if we can remove processed candidates
         candidates = state.get("scored") or state.get("filtered") or state.get("candidates") or []
         coro = provider.check(candidates)
         timeout = settings.availability_time_budget_seconds
