@@ -41,7 +41,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["services*", "namesmith_schemas*"]
+include = ["services*", "packages*", "namesmith_schemas*"]
 
 [tool.setuptools.package-dir]
 namesmith_schemas = "packages/shared_py/namesmith_schemas"

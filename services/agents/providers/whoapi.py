@@ -5,6 +5,7 @@ from typing import Iterable, Sequence
 
 import httpx
 
+from ..settings import settings
 from ..state import AvailabilityResult, Candidate, ScoredCandidate
 from .base import AvailabilityProvider
 
@@ -20,11 +21,12 @@ class WhoapiAvailabilityProvider(AvailabilityProvider):
         *,
         base_url: str = "https://api.whoapi.com",
         request_type: str = "taken",
+        timeout: float | None = None,
     ) -> None:
         self._api_key = api_key
         self._request_type = request_type
         self._base_url = base_url.rstrip("/") + "/"
-        self._timeout = 10.0
+        self._timeout = timeout or settings.dns_timeout_seconds
 
     async def check(self, candidates: Iterable[Candidate | ScoredCandidate]) -> Sequence[AvailabilityResult]:
         results: list[AvailabilityResult] = []

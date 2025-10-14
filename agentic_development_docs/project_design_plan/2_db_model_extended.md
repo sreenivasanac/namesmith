@@ -33,9 +33,18 @@ Indexes
   - trace_id (text, null ok)  // Langfuse or APM trace
   - eval_scores (jsonb, null ok)
 
+- job_domain_links
+  - job_id (uuid, fk → jobs.id)
+  - domain_id (uuid, fk → domain_names.id)
+  - linked_at (timestamptz, default now)
+
 Indexes
 - jobs(status)
 - agent_runs(job_id)
+- job_domain_links(job_id, domain_id) unique
+
+Notes
+- `job_domain_links` maintains provenance for generated domains so ownership via `jobs.created_by` is queryable without denormalizing domain tables.
 
 ## Research Sources & Trends
 - trend_sources

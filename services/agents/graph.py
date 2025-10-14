@@ -3,11 +3,7 @@ from __future__ import annotations
 
 from langgraph.constants import END
 from langgraph.graph import StateGraph
-# TODO check if this can be moved to one recent version only
-try:  # pragma: no cover - compatibility shim across langgraph versions
-    from langgraph.graph.state import CompiledGraph
-except ImportError:  # noqa: WPS433
-    from langgraph.graph.state import CompiledStateGraph as CompiledGraph
+from langgraph.graph.state import CompiledStateGraph as CompiledGraph
 
 from .nodes.availability import build_availability_node
 from .nodes.dedupe import dedupe_and_filter

@@ -1,10 +1,14 @@
 """LLM-backed providers for generation, scoring, and availability."""
 from __future__ import annotations
 
+import json
+import logging
 import random
-from typing import Any, Iterable, Sequence
+from dataclasses import dataclass
+from typing import Any, Callable, Iterable, Sequence
 
 from litellm import acompletion
+from pydantic import BaseModel, TypeAdapter
 
 from ..prompts import (
     build_generation_messages,
@@ -14,6 +18,8 @@ from ..prompts import (
     parse_scoring_payload,
 )
 from ..settings import settings
+from packages.shared_py.namesmith_schemas.registrars import DomainAvailabilityProvider
+
 from ..state import (
     AvailabilityResult,
     Candidate,
@@ -25,53 +31,12 @@ from ..state import (
 from .base import AvailabilityProvider, GenerationProvider, ScoringProvider
 
 
-def _coerce_candidate(payload: dict[str, str] | Candidate) -> Candidate:
-    if isinstance(payload, Candidate):
-        return payload
-    label = payload.get("label")
-    tld = payload.get("tld")
-    if not label or not tld:
-        raise ValueError("LLM generation payload must include 'label' and 'tld'")
-    return Candidate(
-        label=label.lower(),
-        tld=tld.lower(),
-        display_name=payload.get("display_name") or label.capitalize(),
-        reasoning=payload.get("reasoning"),
-    )
+class CandidateList(BaseModel):
+    items: list[Candidate]
 
 
-def _coerce_scored_candidate(payload: dict[str, float | str] | ScoredCandidate) -> ScoredCandidate:
-    if isinstance(payload, ScoredCandidate):
-        return payload
-    label = payload.get("label")
-    tld = payload.get("tld")
-    if not label or not tld:
-        raise ValueError("LLM scoring payload must include 'label' and 'tld'")
-
-    def _as_score(value: float | str | None) -> int:
-        if value is None:
-            return 10
-        try:
-            return max(1, min(10, int(round(float(value)))))
-        except (TypeError, ValueError) as exc:  # noqa: PERF203
-            raise ValueError("LLM scoring payload must include numeric scores") from exc
-
-    rationale_raw = payload.get("rationale", "It's a very good domain name.")
-    rationale = str(rationale_raw).strip()
-    if len(rationale) > 200:
-        rationale = rationale[:200]
-
-    return ScoredCandidate(
-        label=label.lower(),
-        tld=tld.lower(),
-        display_name=payload.get("display_name") or label.capitalize(),
-        memorability=_as_score(payload.get("memorability")),
-        pronounceability=_as_score(payload.get("pronounceability")),
-        brandability=_as_score(payload.get("brandability")),
-        overall=_as_score(payload.get("overall")),
-        rubric_version=str(payload.get("rubric_version", settings.scoring_rubric_version)),
-        rationale=rationale,
-    )
+class ScoredCandidateList(BaseModel):
+    items: list[ScoredCandidate]
 
 
 class LLMGenerationProvider(GenerationProvider):
@@ -100,16 +65,25 @@ class LLMGenerationProvider(GenerationProvider):
             model=self._model_name,
             messages=messages,
             temperature=self._temperature,
+            # Hint to supported providers to produce a JSON object with 'items'
+            response_format=CandidateList,
             **self._completion_kwargs,
         )
+        logger.info("LLM response (generation): %s", _format_llm_response(response))
         content = _extract_message_content(response)
         payload = extract_json_payload(content)
+        # Accept either {items: [...]} or raw list for backward compatibility
+        if isinstance(payload, dict) and "items" in payload:
+            try:
+                parsed = CandidateList.model_validate(payload)
+                return list(TypeAdapter(list[Candidate]).validate_python(parsed.items))
+            except Exception:
+                pass
         raw_candidates = parse_generation_payload(payload)
-        return [_coerce_candidate(item) for item in raw_candidates]
+        return list(TypeAdapter(list[Candidate]).validate_python(raw_candidates))
 
 
 class LLMScoringProvider(ScoringProvider):
-    """Delegate scoring to an injected LLM callable."""
 
     def __init__(
         self,
@@ -130,18 +104,49 @@ class LLMScoringProvider(ScoringProvider):
             model=self._model_name,
             messages=messages,
             temperature=self._temperature,
+            response_format=ScoredCandidateList,
             **self._completion_kwargs,
         )
+        logger.info("LLM response (scoring): %s", _format_llm_response(response))
         content = _extract_message_content(response)
         payload = extract_json_payload(content)
         raw_scores = parse_scoring_payload(payload)
-        return [_coerce_scored_candidate(item) for item in raw_scores]
+        adjusted: list[dict[str, Any]] = []
+        weights = settings.scoring_rubric_weights or {}
+        total_weight = sum(weights.values())
+        for item in raw_scores:
+            if item.get("overall") is None:
+                m = item.get("memorability")
+                p = item.get("pronounceability")
+                b = item.get("brandability")
+                try:
+                    m_f, p_f, b_f = int(m), int(p), int(b)
+                except Exception:
+                    m_f, p_f, b_f = 10, 10, 10
+                item["overall"] = int((m_f + p_f + b_f) / 3)
+            adjusted.append(item)
+        # Try strict schema first if provider returned object
+        if isinstance(payload, dict) and "items" in payload:
+            try:
+                parsed = ScoredCandidateList.model_validate({"items": adjusted})
+                return list(TypeAdapter(list[ScoredCandidate]).validate_python(parsed.items))
+            except Exception:
+                pass
+        return list(TypeAdapter(list[ScoredCandidate]).validate_python(adjusted))
 
 
 class StubAvailabilityProvider(AvailabilityProvider):
     """Return probabilistic availability results to avoid real registrar costs."""
 
-    def __init__(self, registrar: str = "stub") -> None:
+    def __init__(
+        self,
+        api_key: str,
+        *,
+        timeout: float | None = None,
+        registrar: str = "stub",
+    ) -> None:
+        self._api_key = api_key  # Unused but kept for consistency
+        self._timeout = timeout  # Unused but kept for consistency
         self._registrar = registrar
 
     async def check(self, candidates: Iterable[Candidate | ScoredCandidate]) -> Sequence[AvailabilityResult]:
@@ -159,103 +164,108 @@ class StubAvailabilityProvider(AvailabilityProvider):
         return results
 
 
+@dataclass(frozen=True)
+class AvailabilityProviderRegistration:
+    requires_api_key: bool
+    factory: Callable[[str], AvailabilityProvider]
+    missing_key_error: str | None = None
+
+
+def _create_availability_provider_registry() -> dict[DomainAvailabilityProvider, AvailabilityProviderRegistration]:
+    from .whoapi import WhoapiAvailabilityProvider
+    from .whoisjson import WhoisJsonAvailabilityProvider
+
+    # TODO reduce this code to be more modular / Code design.
+    timeout = settings.dns_timeout_seconds
+
+    return {
+        DomainAvailabilityProvider.STUB: AvailabilityProviderRegistration(
+            requires_api_key=False,
+            factory=lambda api_key: StubAvailabilityProvider(api_key=api_key, timeout=timeout),
+        ),
+        DomainAvailabilityProvider.WHOAPI: AvailabilityProviderRegistration(
+            requires_api_key=True,
+            factory=lambda api_key: WhoapiAvailabilityProvider(api_key=api_key, timeout=timeout),
+            missing_key_error="WhoAPI API key must be configured to use 'whoapi' registrar provider.",
+        ),
+        DomainAvailabilityProvider.WHOISJSONAPI: AvailabilityProviderRegistration(
+            requires_api_key=True,
+            factory=lambda api_key: WhoisJsonAvailabilityProvider(api_key=api_key, timeout=timeout),
+            missing_key_error="WhoisJSON API key must be configured to use 'whoisjson' registrar provider.",
+        ),
+    }
+
+
+_AVAILABILITY_PROVIDER_REGISTRY = _create_availability_provider_registry()
+
+
 def build_default_providers(
     *,
     generation_model: str | None = None,
     scoring_model: str | None = None,
 ) -> tuple[GenerationProvider, ScoringProvider, AvailabilityProvider]:
-    from .whoapi import WhoapiAvailabilityProvider
-    from .whoisjson import WhoisJsonAvailabilityProvider
-
     generation = LLMGenerationProvider(model_name=generation_model or settings.generation_model)
     scoring = LLMScoringProvider(model_name=scoring_model or settings.scoring_model)
 
-    provider_name = (settings.registrar_provider or "stub").strip().lower()
-    availability: AvailabilityProvider
+    provider_setting = settings.registrar_provider
+    if provider_setting is None:
+        raise ValueError("Registrar provider must be configured; stub provider is reserved for tests.")
 
-    if provider_name == "stub":
-        availability = StubAvailabilityProvider()
-    elif provider_name == "whoapi":
-        if not settings.whoapi_api_key:
-            availability = StubAvailabilityProvider(registrar="whoapi-missing-key")
-        else:
-            availability = WhoapiAvailabilityProvider(api_key=settings.whoapi_api_key)
-    elif provider_name in {"whoisjson", "whoisjsonapi"}:
-        if not settings.whoisjson_api_key:
-            availability = StubAvailabilityProvider(registrar="whoisjson-missing-key")
-        else:
-            availability = WhoisJsonAvailabilityProvider(api_key=settings.whoisjson_api_key)
-    else:
-        raise ValueError(f"Unsupported registrar provider '{settings.registrar_provider}'")
+    if isinstance(provider_setting, str):
+        normalized = provider_setting.strip()
+        if not normalized:
+            raise ValueError("Registrar provider must be configured; stub provider is reserved for tests.")
+        try:
+            provider_setting = DomainAvailabilityProvider.from_str(normalized)
+        except ValueError as exc:
+            raise ValueError(f"Unsupported registrar provider '{provider_setting}'") from exc
+
+    registration = _AVAILABILITY_PROVIDER_REGISTRY.get(provider_setting)
+    if registration is None:
+        raise ValueError(f"Unsupported registrar provider '{provider_setting}'")
+
+    api_key = settings.get_domain_availability_api_key(provider_setting)
+    if registration.requires_api_key and not api_key:
+        message = registration.missing_key_error or (
+            f"API key must be configured to use '{provider_setting.value}' registrar provider."
+        )
+        raise ValueError(message)
+
+    availability = registration.factory(api_key or "mock-api-key")
 
     return generation, scoring, availability
 
 
-def _extract_message_content(response: dict[str, Any]) -> str:
-    choices = response.get("choices")
-    if not choices:
-        raise ValueError("LLM response missing choices")
+def _extract_message_content(response: Any) -> str:
+    """Extract text content from LiteLLM responses.
 
-    first_choice = choices[0]
-    
-    # Handle Choice objects from litellm/OpenAI SDK
-    if hasattr(first_choice, "message"):
-        # It's a Choice object, access attributes directly
-        message = first_choice.message
-        if hasattr(message, "content"):
-            content = message.content
-        else:
-            content = getattr(message, "text", None)
-    elif isinstance(first_choice, dict):
-        # It's a dict-like response
-        message = first_choice.get("message") or {}
-        content: Any = message.get("content")
-    else:
-        # Try to convert to dict if it has __dict__ attribute
-        if hasattr(first_choice, "__dict__"):
-            first_choice = first_choice.__dict__
-            message = first_choice.get("message") or {}
-            content = message.get("content")
-        else:
-            raise ValueError(f"LLM response choice is an unexpected type: {type(first_choice)}")
+    LiteLLM returns OpenAI-compatible dict with structure:
+    - dict["choices"][0]["message"]["content"] (chat completion)
+    """
+    try:
+        return response["choices"][0]["message"]["content"]
+    except (KeyError, TypeError, IndexError) as e:
+        raise ValueError(f"Failed to extract content from LLM response: {e}") from e
 
-    if isinstance(content, list):
-        text_fragments: list[str] = []
-        for item in content:
-            if not isinstance(item, dict):
-                continue
-            if item.get("type") == "text" and isinstance(item.get("text"), str):
-                text_fragments.append(item["text"])
-        content = "".join(text_fragments)
 
-    if isinstance(content, str) and content.strip():
-        return content
+def _format_llm_response(response: Any) -> str:
+    if hasattr(response, "model_dump_json"):
+        try:
+            return response.model_dump_json()
+        except Exception:
+            pass
+    if hasattr(response, "model_dump"):
+        try:
+            return json.dumps(response.model_dump(), ensure_ascii=False)
+        except Exception:
+            pass
+    try:
+        return json.dumps(response, ensure_ascii=False)
+    except TypeError:
+        return repr(response)
 
-    # Handle delta for streaming responses (if first_choice is dict-like)
-    if isinstance(first_choice, dict):
-        delta = first_choice.get("delta")
-        if isinstance(delta, dict):
-            delta_content = delta.get("content")
-            if isinstance(delta_content, str) and delta_content.strip():
-                return delta_content
 
-        text_field = first_choice.get("text")
-        if isinstance(text_field, str) and text_field.strip():
-            return text_field
-    elif hasattr(first_choice, "delta"):
-        # Handle object-based delta
-        delta = first_choice.delta
-        if hasattr(delta, "content"):
-            delta_content = delta.content
-            if isinstance(delta_content, str) and delta_content.strip():
-                return delta_content
-    elif hasattr(first_choice, "text"):
-        # Handle object-based text field
-        text_field = first_choice.text
-        if isinstance(text_field, str) and text_field.strip():
-            return text_field
-
-    raise ValueError("LLM response missing message content")
+logger = logging.getLogger(__name__)
 
 
 __all__ = [

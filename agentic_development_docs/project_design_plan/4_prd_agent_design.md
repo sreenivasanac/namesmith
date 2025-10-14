@@ -13,6 +13,30 @@ Entry B) 1.2) gather_similar_names (optional) →
 7) persist_results →
 8) notify_human (optional)
 
+### LangGraph stateflow (current implementation)
+
+```mermaid
+flowchart LR
+  %% Executor builds providers and the graph, then invokes it with GenerationStateDict
+  subgraph Executor
+    EXE[run_generation_job]
+    PROV[Resolve models → build providers]
+    BUILD[build_generation_graph]
+    EXE --> PROV --> BUILD
+  end
+
+  subgraph "LangGraph: Generation Pipeline"
+    GC["gather_context\n(writes: trends, company_examples)"] -->
+    GEN["generate\n(writes: candidates)"] -->
+    DED["dedupe\n(writes: filtered)"] -->
+    SCO["score\n(writes: scored)"] -->
+    AV["availability\n(writes: availability)"] -->
+    PER["persist\n(DB writes, updates progress)"] --> END((END))
+  end
+
+  EXE --> GC
+```
+
 State schema (typed Pydantic):
 ```
 class GenerationState(BaseModel):
@@ -42,15 +66,15 @@ Overview & Conventions
 - Runtime: Python LangGraph. All blocking work uses async I/O where applicable.
 - Orchestration: The API (FastAPI) creates a job and, for now, schedules LangGraph execution in-process via `asyncio.create_task`; once long-running steps are added we will migrate to Celery workers. For small availability batches, the API is currently invoking availability checks synchronously without a Celery handoff. If Celery is required, we will move to Celery.
 <!-- - Checkpointing: After each major node boundary, the graph stores a checkpoint (Postgres-backed store) keyed by `job_id` and step name for resumability and idempotency.
-Observability: Each node logs to Langfuse with prompt/version (where applicable), step metrics, and error traces; progress counters update `jobs`/`agent_runs`. -->
- - Providers: LLM/registrar/Domain name availability checking API - abstracted behind provider interfaces; vendors API keys are fetched via env flags; registrar API calls are capped per job and rate-limited per provider. Current implementation uses the placeholder context gatherer; investor-specific retrieval remains a TODO.
+Observability: Each node logs to Langfuse with prompt/version (where applicable), step metrics, and error traces; progress counters update `jobs`/`agent_runs`. (Not implemented, maybe can consider later.) -->
+ - Providers: LLM/registrar/Domain name availability checking API - abstracted behind provider interfaces; vendors API keys are fetched via env flags; registrar API calls are capped per job and rate-limited per provider. WhoisJSON is the preferred registrar integration, WhoAPI is an opt-in alternative, and if neither registrar credential is configured the graph falls back to the probabilistic stub provider. Current implementation returns empty context from `gather_context`; investor-specific retrieval remains a TODO.
  <!-- LLM Vendors are rate-limited - to avoid huge bills. -->
  - User context: `user_id` is populated from Supabase JWT; used for quotas, provenance on `jobs.created_by`, and scoping of results visible in the Console.
 
 Start Modes & Selection
 - Two entry pathways can initiate a job:
   - Entry A (Investors): `gather_trends` for general research. Investors may optionally provide a short prompt; both prompt and trends inform generation.
-  - Entry B (Businesses): `gather_similar_names` for business owners who supply a brief about their idea/use case; we may also call `gather_trends` to enrich topical context.
+  - Entry B (Businesses): `gather_similar_names` for business owners who supply a brief about their idea/use case;
  - Selection logic:
    - If a business prompt is present → run `gather_similar_names`.
    - If only investor research (no business prompt) → run `gather_trends`.
@@ -70,15 +94,15 @@ Node Details
 - Rules:
   <!-- - Time budget per job; respect `limit` and `source` feature flags.
   - Deduplicate by title/url hash; collapse near-duplicates. -->
-  - No LLM calls here; purely retrieval/curation.
 - Failure handling: If unavailable, continue with empty `trends` and mark a soft warning (non-blocking).
-- Implementation status: currently stubbed by tokenizing the topic/prompt to generate placeholder trends.
+- Implementation status: currently returns an empty trends list until real data sources are wired up.
 
 
 1.2) gather_similar_names (Path‑2 for businesses looking for names; prompt‑driven)
 - Purpose: Retrieve examples of similar businesses and their names to ground generation in the user’s brief (domain, category, target audience, tone).
 - Inputs: Business prompt (idea/use case, constraints like tone/length/keywords/TLDs), optional `topic/categories`.
 - Outputs: `company_examples: list[CompanyExample]` and `derived_categories/tags` to inform prompts.
+- Implementation status: currently returns an empty company_examples list until data sources are implemented.
 - Data sources:
   - `company_names` table populated via scraping (e.g., YC lists, Crunchbase summaries, other directories). Each row ideally has: company_name, domain, description, categories/tags, source, and optional embeddings.
   - When available, embeddings enable semantic similarity; otherwise, keyword/category matching is used.
@@ -86,7 +110,7 @@ Node Details
   - Parse the prompt → extract industry, audience, tone, constraints.
   - Query `company_names`:
     - Filter by extracted categories/keywords.
-    - Rank by embedding similarity to the prompt and/or TF‑IDF/cosine on descriptions.
+    - Rank by embedding similarity to the company descriptions.
     - Return top‑K examples with fields { name, domain, description, categories, source, score }.
   - Deduplicate examples by domain/name; normalize categories/tags set.
   - Derive prompt hints (e.g., “avoid overly generic patterns”, desired syllable counts, style/tone) from examples.
@@ -102,10 +126,10 @@ Node Details
 - Outputs: `candidates: list[Candidate]` size ≥ `requested × oversample_factor` (e.g., 2–3x for headroom).
 - Method:
   - Prompt LLM with structured instructions to avoid hyphens/numbers unless requested; encourage pronounceable, short, brandable labels; include rationale briefly.
-  - LiteLLM calls the selected `generation_model` supplied by the API/job, so swapping vendors only requires a model string change.
+  - LiteLLM calls the selected `generation_model` supplied by the API/job, enforcing a JSON-only response schema so swapping vendors only requires a model string change.
   - Context assembly: merge `trends` (Entry A) and `company_examples` + prompt (Entry B) into concise bullets for the system prompt; dedupe overlapping tags and keep within token budget.
   - Generate label-first; TLD assignment may happen later based on `tlds` preferences and validity rules.
-  - Capture prompt version in Langfuse; tag with rubric and model info.
+  - Capture prompt version in Langfuse; tag with rubric and model info. (This is to be implemented in latest version.)
 <!-- - Constraints: Maximum token/call budget per job; batch LLM calls when needed; backoff on vendor rate limits.
 Failure handling: Retry with exponential backoff for transient errors; on persistent failure, reduce batch size or fall back to heuristic mini-generator. -->
 
@@ -168,6 +192,7 @@ class CompanyExample(BaseModel):
 - Inputs: Results from precheck.
 - Outputs: `availability` finalized statuses: `available | registered | error` with provider details.
 - Providers: Pluggable (WhoisJSON primary; WhoAPI optional via feature flags). All raw responses recorded for audit.
+  - If no registrar provider credentials are present, availability verification defers to the probabilistic stub provider so jobs can still complete without paid lookups.
 - Method:
   - Preferred integration: https://whoisjsonapi.com/v1/status (implementation: `services/agents/providers/whoisjson.py` ; Documentation `agentic_development_docs/tools_documentation/whoisjsonapi_documentation.md` for API documentation reference).
   - Batch requests when supported; respect vendor quotas and per-minute caps.
@@ -193,7 +218,7 @@ class CompanyExample(BaseModel):
 - UI links: Provide Console deep links to job detail and to filtered domain lists.
 
 Parallelism & Scheduling
-- Subgraphs: `score_names` and `availability_*` can run in separate branches; default is sequential `score → availability` for simpler UX.
+- Subgraphs: `score_names` and `availability_*` - default is sequential `score → availability` for simpler UX. Maybe in the future, these two nodes can run in separate branches; 
 - Chunking: Process candidates in chunks (e.g., 25–50) to bound memory and API limits.
 - Concurrency: Bounded per provider/resolver; backpressure ensures quotas are not exceeded.
 
@@ -204,10 +229,11 @@ Checkpointing & Resilience
 
 Configuration
 - Env flags: model/provider selection, concurrency caps, time budgets, rubric weights, availability thresholds, DNS timeouts.
-- Settings expose an optional LiteLLM model allowlist; API validation rejects requests outside this set and defaults fall back to configured generation/scoring models.
+- Settings expose an optional LiteLLM model allowlist; API validation rejects requests outside this set and defaults fall back to configured generation/scoring models. Generation and scoring prompts run through LiteLLM with JSON-only schemas, and the selected model names are persisted on each job (`jobs.params`) so API consumers can display the active configuration.
 - Feature flags: enable/disable `gather_trends`, choose registrar providers, toggle LLM judge.
 
 Observability & Metrics
+- To be implemented later
 - TODO: Integrate Langfuse traces for LLM/tool calls with prompt/version tracking linked to `agent_runs.trace_id`.
 - Metrics: counts (generated, filtered, scored, checked), latency per node, provider error rates, duplicate ratio.
 - TODO: Enable Sentry and OTEL instrumentation across API → worker → DB.

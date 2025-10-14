@@ -43,6 +43,7 @@
   - If you have any question about the implementation, which is an important one, then you can stop and ask me before continuing the implementation.
   - For any communication or logging during development, write documents to `agentic_development_docs/agent_communication/`.
     - Examples include: assumptions made during implementation, design notes, and future work ideas.
+    - Future work remaining like TODOs, you can update in agentic_development_docs/agent_communication/future_work.md
   - Feel free to create new markdown files when you want to log your progress, implementation or if you think it will be useful for continuing the implementation of the project.
   - If there are TODOs, add as comment in the same code file while you are implementing them.
 

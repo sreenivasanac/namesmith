@@ -1,13 +1,14 @@
 """Entry points for running agent workflows."""
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 
+logger = logging.getLogger(__name__)
+
 # TODO check if this can be made into ONE recent version only
-try:  # pragma: no cover - compatibility shim across langgraph versions
-    from langgraph.graph.state import CompiledGraph
-except ImportError:  # noqa: WPS433
-    from langgraph.graph.state import CompiledStateGraph as CompiledGraph
+
+from langgraph.graph.state import CompiledStateGraph as CompiledGraph
 
 from services.api.db.session import SessionFactory
 from services.api.repositories import get_job, update_job_status
