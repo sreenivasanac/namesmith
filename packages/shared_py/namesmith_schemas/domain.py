@@ -10,6 +10,13 @@ from pydantic import Field
 from .base import AvailabilityStatus, NamesmithModel
 
 
+class DomainFiltersMetadata(NamesmithModel):
+    statuses: list[str] = Field(default_factory=list)
+    tlds: list[str] = Field(default_factory=list)
+    agent_models: list[str] = Field(default_factory=list)
+    industries: list[str] = Field(default_factory=list)
+
+
 class DomainAvailability(NamesmithModel):
     status: AvailabilityStatus
     agent_model: Optional[str] = None
@@ -61,6 +68,7 @@ class Domain(NamesmithModel):
 class DomainListResponse(NamesmithModel):
     items: list[Domain]
     next_cursor: Optional[str] = None
+    filters: Optional[DomainFiltersMetadata] = None
 
 
 __all__ = [
@@ -69,4 +77,5 @@ __all__ = [
     "DomainEvaluation",
     "DomainListResponse",
     "DomainSeoAnalysis",
+    "DomainFiltersMetadata",
 ]

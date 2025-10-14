@@ -5,6 +5,7 @@ agentic_development_docs/tools_documentation/*.md
 old_code/
 
 .env
+**/.env.local
 
 # Python build / cache artifacts
 *.egg-info/
@@ -13,3 +14,6 @@ old_code/
 .vscode/
 
 agentic_development_docs/rough_prompts/*
+
+node_modules/*
+node_modules/

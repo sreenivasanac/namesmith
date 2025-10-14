@@ -102,9 +102,15 @@ async def get_generation_job(
     session: AsyncSession = Depends(db_session),
     user: UserContext = Depends(get_current_user),
 ) -> JobResponse:
-    job = await get_job(session, job_id)
-    if job is None:
-        raise HTTPException(status_code=404, detail="Job not found")
-    if user.id is not None and job.created_by and job.created_by != user.id:
-        raise HTTPException(status_code=403, detail="Not authorized to view this job")
-    return serialize_job(job, progress=(job.params or {}).get("progress"))
+    try:
+        job = await get_job(session, job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        if user.id is not None and job.created_by and job.created_by != user.id:
+            raise HTTPException(status_code=403, detail="Not authorized to view this job")
+        return serialize_job(job, progress=(job.params or {}).get("progress"))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error fetching job %s: %s", job_id, str(e))
+        raise HTTPException(status_code=500, detail=f"Error fetching job: {str(e)}") from e
