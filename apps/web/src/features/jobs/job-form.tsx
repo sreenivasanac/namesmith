@@ -58,7 +58,7 @@ export function CreateJobForm() {
             .filter(Boolean) ?? [],
         tlds:
           values.tlds?.split(",")
-            .map((value: string) => value.trim())
+            .map((value: string) => value.trim().replace(/^\.+/, ""))
             .filter(Boolean) ?? [],
         count: values.count,
         generation_model: values.generation_model?.trim() || undefined,
