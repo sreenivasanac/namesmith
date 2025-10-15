@@ -40,7 +40,7 @@ class Candidate(BaseModel):
     @model_validator(mode="after")
     def _normalize(self) -> "Candidate":
         self.label = (self.label or "").lower()
-        self.tld = (self.tld or "").lower()
+        self.tld = (self.tld or "").lower().lstrip(".")
         if not self.display_name and self.label:
             self.display_name = self.label.capitalize()
         return self
@@ -95,6 +95,11 @@ class GenerationInputs(BaseModel):
     count: int = 20
     generation_model: Optional[str] = None
     scoring_model: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _normalize_tlds(self) -> "GenerationInputs":
+        self.tlds = [tld.lower().lstrip(".") for tld in self.tlds]
+        return self
 
 
 class GenerationState(BaseModel):

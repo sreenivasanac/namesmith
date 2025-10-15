@@ -9,27 +9,25 @@
 | Goals | Non-Goals |
 | --- | --- |
 | Authenticated console using Supabase sessions with automatic token refresh. | Building registrar purchase or resale flows. |
-| Guided job creation flow surfacing model choices, prompt context, and TLD preferences. | Implementing investor/trend research entry (will stub hooks). |
-| Robust dashboard to inspect jobs, poll progress, and inspect run logs. | Implementing real-time WebSocket streaming (leave interfaces ready). |
-| Domain review workspace with filters, sorting, search, detail drawer, CSV export. | Take inspiration from the old Prisma API layer; all data must route through FastAPI. |
-| Consistent styling with shadcn theme, responsive layouts, and accessible interactions. | Mobile-native apps or offline sync. |
+| Job creation flow surfacing model choices, prompt context, and TLD preferences. | Implementing investor/trend research entry (will stub hooks). |
+| Dashboard to inspect jobs and poll progress. | Implementing real-time WebSocket streaming. |
+| Domain review workspace with filters, sorting, search, and detail drawer. | Mobile-native apps or offline sync. |
+| Consistent styling with shadcn theme and accessible interactions. | |
 
 ## High-Level User Flows
 1. **Authentication**
    - User hits `/login`, authenticates via Supabase Auth hosted UI (email/password or magic link).
    - Supabase client stores the session; a fetch wrapper injects `Authorization: Bearer <token>` for backend calls.
 2. **Create Domain Generation Job**
-   - From dashboard CTA or `/jobs/new`, user completes a multi-step form (business prompt, categories, TLDs, quantity, model selections).
+   - From dashboard CTA or `/jobs/new`, user completes a single-page form (business prompt, categories, TLDs, quantity, model selections).
    - `POST /v1/jobs/generate` is invoked through a React Query mutation; successful response navigates to the new job detail page with toast confirmation.
 3. **Track Job Progress**
-   - Job detail view polls `GET /v1/jobs/{id}` (3s cadence) until status is `succeeded` or `failed`, showing incremental counts (`generated`, `scored`, `availability_checked`).
-   - Progress timeline and agent run log (from `job.runs`) communicate internal steps and any errors.
+   - Job detail view polls `GET /v1/jobs/{id}` (3s cadence) until status is `succeeded` or `failed`, showing progress metrics.
 4. **Review Domain Results**
-   - The job detail page and `/domains` route share a table UI with left filter rail (availability, TLDs, models, industries, score sliders) inspired by the legacy console.
-   - Table supports server-side pagination parameters (`cursor`, `limit`), sorting, search, and virtualization for large result sets; selecting a row opens an info drawer.
+   - The job detail page and `/domains` route share a table UI with left filter rail (availability, TLDs, models, industries, score sliders).
+   - Table supports server-side pagination parameters (`cursor`, `limit`), sorting, and search; selecting a row opens an info drawer.
 5. **Follow-Up Actions**
-   - Users can copy names, flag favorites (client-side bookmark list), trigger availability re-checks, and export current table view as CSV.
-   - Future actions like feedback submission hit `/v1/feedback` when implemented.
+   - Users can view detailed domain information in a side drawer with external WHOIS link.
 
 ## Application Architecture
 - **Framework**: Next.js App Router (TypeScript) with a mix of server components (initial data fetch, auth gating) and client components (interactive tables, filters).
@@ -64,8 +62,7 @@
 ## Routing & Layout
 - **Protected Shell**: `(dashboard)/layout.tsx` renders sidebar navigation (Dashboard, Domains, Jobs, Settings placeholder), header with branding (`settings.branding_name`), and user menu.
 - **Auth Boundary**: `/login` resides in `(auth)` route segment with minimal layout; middleware redirects logged-in users away from login and unauthorized users into it.
-- **Nested Views**: Job detail uses child routes (tabs via URL query) for "Overview", "Domains", and "Run Log" while sharing server-fetched job metadata to avoid duplicate requests.
-- **Responsive Behaviour**: Sidebar collapses to top drawer on mobile; filters convert to modal with accordions for smaller screens.
+- **Nested Views**: Job detail pages share server-fetched job metadata to avoid duplicate requests.
 
 ## Data Fetching Strategy
 - **Query Keys**
@@ -77,8 +74,6 @@
   - `['filters']` → new `GET /v1/domains/filters` (to implement) returning distinct values for sidebar options
 - **Mutations**
   - `createJob` (`POST /v1/jobs/generate`) invalidates `['jobs']` and prefetches `['job', id]`.
-  - `recheckAvailability` (`POST /v1/availability/check`) updates affected domain caches.
-  - `submitFeedback` (`POST /v1/feedback`) appends feedback to domain detail (placeholder until backend ready).
 - **Server Rendering**
   - Dashboard and job detail pages fetch initial data server-side using Supabase session to hydrate React Query caches via `dehydrate`.
   - All fetches respect API pagination; infinite scroll (Load more) handled via React Query `useInfiniteQuery` for domains.
@@ -91,48 +86,41 @@ Update the backend `/v1/domains` API endpoint - to return relavant domain relate
   - Top metrics cards (jobs run, available domains) with skeleton states; uses forthcoming summary endpoint or computes from cached data.
   - Recent jobs table with status badges (`queued`, `running`, `succeeded`, `failed`) and context menu actions.
 - **Job Form**
-  - Multi-step wizard using shadcn `Stepper` component.
-  - Validated with `zod`; real-time preview of prompt context and computed request size estimate.
-  - Model selection dropdown populated from backend allowlist (fallback to default).
+  - **Implemented as**: Single-page form with all fields visible (simplified from original multi-step wizard plan).
+  - Validated with `zod`; fields for entry path, prompt, categories, TLDs, count, and model selections.
+  - Model selection input fields allow custom model names (backend validates against allowlist).
 - **Job Detail**
-  - Header card summarizing job info (prompt excerpt, categories, TLDs, model names, timestamps, user).
-  - Progress bar + timeline; run log table reading `job.runs` to surface agent stage insights.
-  - Domain table scoped to job, with quick filters (availability toggles, minimum score slider).
+  - Header cards showing job status, models used, and progress metrics.
+  - Domain table scoped to job with infinite scroll pagination.
 - **Domain Explorer**
-  - Filter rail replicates legacy UI with Tailwind grid: availability checkboxes with emoji badges, TLD multi-select, bot/model checkboxes, industry chips, score sliders.
-  - Table built on TanStack Table + shadcn `Table`, with column sorting, resizable columns, and optional column visibility controls.
-  - Bulk actions toolbar when rows selected; includes copy, export, re-check availability.
+  - Filter rail with availability checkboxes, TLD multi-select, model checkboxes, industry chips, and score sliders.
+  - Table built on TanStack Table + shadcn `Table` with client-side column sorting.
 - **Domain Detail Drawer**
-  - shadcn `Sheet` component with tabs for "Summary", "Evaluation", "Availability history", "Notes".
-  - Displays audit info (processed_by_agent, agent_model, timestamps) and provides quick action buttons.
+  - shadcn `Sheet` component displaying domain information, evaluation scores, and SEO analysis.
+  - Shows audit info (processed_by_agent, agent_model, timestamps) and external WHOIS link.
 - **Notifications**
   - shadcn `useToast` for success/error.
   - Inline banners for persistent warnings (e.g., missing availability provider).
 
 ## Filter & Search Behaviour
-- URL query parameters represent active filters (e.g., `?status=available&memorability_min=7&memorability_max=10`).
-- Zustand store syncs with URL; initial load parses query to seed store, mirroring legacy behaviour with stronger typing.
-- Numeric sliders default to [1,10]; updates change state immediately but API refetches occur when user clicks "Apply filters" (auto-apply later via debounce).
+- Filter state managed in Zustand store.
+- Numeric sliders default to [1,10]; updates trigger API refetches automatically.
 - Search input debounced (300ms) to avoid excessive fetches.
-- Distinct filter metadata fetched once then memoized; fallback gracefully if endpoint unavailable (derive from current page results).
+- Filter metadata fetched from backend `/v1/domains` response; includes statuses, TLDs, agent_models, and industries.
 
 ## Real-Time Updates & Background Activity
-- Job detail polling stops upon success/failure; manual "Refresh" button available.
-- React Query `onSuccess` handler compares previous status to trigger notifications.
-- Availability re-check triggers progress indicator per domain and updates status cell optimistically.
-- Future WebSocket integration kept possible by isolating polling logic inside a hook.
+- Job detail polling (3s intervals) stops upon success/failure.
+- React Query refetch intervals handle status updates automatically.
 
 ## Authentication & Authorization
 - Supabase session stored in cookies; server components access via Supabase server client to fetch JWT for backend requests.
-- Custom `withAuth` layout ensures unauthorized users redirect to `/login`.
-- UI respects role (from Supabase JWT claims or `/v1/users/me`): viewers see disabled mutation buttons with tooltips; editors/admins access mutating actions.
+- Protected layout ensures unauthorized users redirect to `/login`.
 - Logout button clears Supabase session and invalidates React Query caches.
 
 ## Accessibility & Responsiveness
-- All interactive controls use shadcn components with built-in accessibility; additional `aria-label` props for icon-only buttons.
-- Keyboard navigation supported across filters and tables (focus rings, skip links).
+- All interactive controls use shadcn components with built-in accessibility.
+- Keyboard navigation supported across filters and tables.
 - Drawer enforces focus trap and escape-to-close behaviour.
-- Responsive breakpoints ensure table scrolls horizontally while filters collapse into a modal on small screens.
 
 ## Styling & Theming
 - Apply provided OKLCH theme tokens in `globals.css`; map to Tailwind via CSS variables for colours, radii, shadows.
@@ -142,10 +130,9 @@ Update the backend `/v1/domains` API endpoint - to return relavant domain relate
 - Follow the shadcn theme style given in agentic_development_docs/project_design_plan/6_frontend_design.md 
 
 ## Performance Considerations
-- Table virtualization (`@tanstack/react-virtual`) for large domain lists.
 - Paginate domains (default 50 rows) with "Load more" to avoid giant payloads.
-- Memoize derived data (e.g., computed filter summaries) and avoid redundant client-side filtering when server parameters suffice.
-- Abort outstanding fetches when users adjust filters rapidly via `AbortController`.
+- Memoize derived data and avoid redundant client-side filtering when server parameters suffice.
+- React Query handles caching and stale-time optimization.
 
 ## Testing & Quality
 - Unit tests with Vitest + Testing Library for filters, job form, and table components.
@@ -159,15 +146,10 @@ Update the backend `/v1/domains` API endpoint - to return relavant domain relate
 - Sanitize user-provided strings before display; rely on backend validation but escape HTML in rationale fields.
 - Handle 401/403 by signing out and redirecting to login to avoid infinite retry loops.
 
-## Implementation Phasing
-1. **Scaffold & Auth**: Set up Next.js app, Supabase providers, protected layouts, base theme.
-2. **Job Management**: Implement job list/detail pages with polling and run log display.
-3. **Domain Explorer**: Build shared table, filters, and detail drawer integrating `/v1/domains`.
-4. **Job Creation Flow**: Add multi-step form, validation, success redirect, and toasts.
-5. **Enhancements**: CSV export, availability re-check, bookmarks, responsive polish.
-6. **Testing & Hardening**: Expand automated tests, performance profiling, accessibility fixes.
+## Implementation Status
+1. ✅ **Scaffold & Auth**: Next.js app, Supabase providers, protected layouts, base theme.
+2. ✅ **Job Management**: Job list/detail pages with polling.
+3. ✅ **Domain Explorer**: Table, filters, and detail drawer integrating `/v1/domains`.
+4. ✅ **Job Creation Flow**: Single-page form, validation, success redirect, and toasts.
 
-## Open Questions & Future Enhancements
-- Confirm how Langfuse trace links will surface; reserve slot in domain drawer once backend exposes `trace_id`.
-- Determine whether Supabase role mapping is authoritative or if an API `/v1/users/me` endpoint is needed for additional metadata.
-- Explore push notifications (email/Web) for job completion; UI already surfaces status but proactive alerts are deferred.
+

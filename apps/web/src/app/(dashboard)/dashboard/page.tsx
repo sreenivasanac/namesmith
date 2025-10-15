@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import type { JobListResponse } from "@namesmith/shared-ts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createSupabaseServerClient } from "@/lib/auth/supabase-server";
 import { fetchJobs } from "@/lib/api/jobs";
@@ -19,7 +20,7 @@ export default async function DashboardPage() {
   const token = session.access_token;
   const params = new URLSearchParams({ limit: "5" });
   
-  let initialJobs = { items: [], next_cursor: null };
+  let initialJobs: JobListResponse = { items: [], next_cursor: null };
   let apiError = false;
   
   try {
