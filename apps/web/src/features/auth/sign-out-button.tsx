@@ -2,20 +2,23 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { createSupabaseBrowserClient } from "@/lib/auth/supabase-browser";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 export function SignOutButton() {
-  const [supabase] = useState(() => createSupabaseBrowserClient());
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
   const handleSignOut = async () => {
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      const response = await fetch("/api/auth/signout", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to sign out");
+      }
 
       toast.success("Signed out");
       router.replace("/login");
