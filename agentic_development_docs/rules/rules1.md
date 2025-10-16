@@ -52,5 +52,15 @@
   - Keep configuration and branding centralized and easily changeable via constants.
   - Any considerable deviation from these rules requires explicit approval.
 
+- **Next.js Cookie Management Rules**
+  - **DO NOT** use manual cookie setting with `cookieStore.set()` outside of Server Actions or Route Handlers
+  - **DO NOT** use `createServerClient` from `@supabase/ssr` with manual cookie handling in server components
+  - **DO** use `createServerComponentClient` from `@supabase/auth-helpers-nextjs` for Server Components
+  - **DO** use `createRouteHandlerClient` from `@supabase/auth-helpers-nextjs` for API Routes
+  - **DO** use `createBrowserClient` from `@supabase/ssr` for client-side operations
+  - **DO** guard Supabase cookie writes by checking for a mutable `set` method and swallow writes when unavailable
+  - The error "Cookies can only be modified in a Server Action or Route Handler" occurs when trying to set cookies in contexts where Next.js doesn't allow it
+  - Supabase auth helpers for Next.js handle cookie operations automatically and respect Next.js constraints
+
 - **Final Important rules on completion**
   - When you're done, self-critique your work until you're sure it's correct.
