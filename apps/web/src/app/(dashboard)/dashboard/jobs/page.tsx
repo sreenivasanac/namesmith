@@ -10,14 +10,17 @@ export const dynamic = "force-dynamic";
 export default async function JobsPage() {
   const supabase = await createSupabaseServerClient();
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     redirect("/login");
   }
 
-  const token = session.access_token;
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const token = session?.access_token ?? null;
   const initialJobs = token ? await fetchJobs(token, new URLSearchParams()) : { items: [], next_cursor: null };
 
   return (

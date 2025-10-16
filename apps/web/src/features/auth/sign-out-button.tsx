@@ -16,13 +16,14 @@ export function SignOutButton() {
       setLoading(true);
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+
       toast.success("Signed out");
-      router.push("/login");
+      router.replace("/login");
+      router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to sign out");
     } finally {
       setLoading(false);
-      router.refresh();
     }
   };
 

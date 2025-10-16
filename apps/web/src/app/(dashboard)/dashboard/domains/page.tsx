@@ -8,14 +8,18 @@ export const dynamic = "force-dynamic";
 export default async function DomainsPage() {
   const supabase = await createSupabaseServerClient();
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     redirect("/login");
   }
 
-  const initialData = await fetchDomains(session.access_token, { limit: 50 });
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const accessToken = session?.access_token ?? "";
+  const initialData = await fetchDomains(accessToken, { limit: 50 });
 
   return <DomainExplorer initialData={initialData} />;
 }

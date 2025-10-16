@@ -14,17 +14,22 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
   const { jobId } = await params;
   const supabase = await createSupabaseServerClient();
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     redirect("/login");
   }
 
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const accessToken = session?.access_token;
+
   try {
     const [job, domains] = await Promise.all([
-      fetchJob(session.access_token, jobId),
-      fetchDomains(session.access_token, { job_id: jobId, limit: 50 }),
+      fetchJob(accessToken ?? "", jobId),
+      fetchDomains(accessToken ?? "", { job_id: jobId, limit: 50 }),
     ]);
     return <JobDetail job={job} initialDomains={domains} />;
   } catch (error) {

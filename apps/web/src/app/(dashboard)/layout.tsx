@@ -9,14 +9,14 @@ import { SignOutButton } from "@/features/auth/sign-out-button";
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const supabase = await createSupabaseServerClient();
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     redirect("/login");
   }
 
-  const userEmail = session.user.email ?? "user";
+  const userEmail = user.email ?? "user";
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">

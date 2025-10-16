@@ -49,9 +49,22 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@typescript-eslint/parser": "^8",
+    "typescript-eslint": "^8",
+    "@eslint/js": "^9",
+    "@next/eslint-plugin-next": "^15.5.5",
     "eslint": "^9",
-    "eslint-config-next": "15.5.5",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^15",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "pnpm": {
+    "overrides": {
+      "@eslint/eslintrc>ajv": "^6.12.6"
+    }
   }
 }

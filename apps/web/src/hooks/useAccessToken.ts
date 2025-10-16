@@ -8,19 +8,22 @@ export function useAccessToken(): string | null {
   const [supabase] = useState(() => createSupabaseBrowserClient());
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setAccessToken(session?.access_token ?? null);
+    let isMounted = true;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!isMounted) return;
+      setAccessToken(data.session?.access_token ?? null);
     });
 
-    // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setAccessToken(session?.access_token ?? null);
+    } = supabase.auth.onAuthStateChange(async () => {
+      const { data } = await supabase.auth.getSession();
+      setAccessToken(data.session?.access_token ?? null);
     });
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, [supabase]);

@@ -1,3 +1,5 @@
 packages:
   - "apps/*"
   - "packages/*"
+overrides:
+  "@eslint/eslintrc>ajv": "^6.12.6"
