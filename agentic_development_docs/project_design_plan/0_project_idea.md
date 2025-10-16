@@ -38,52 +38,67 @@ Key Performance Indicators (KPIs)
 * Return on investment (ROI) on domain name acquisitions
 
 Key Features
-1. Market Trends Understanding
-    * Bot-1 crawls websites to identify market research, current trends, and historical data
-    * Stores data in database for domain name generation
+Entry A (Investors): Market Trends Understanding
+    * Bot-1 gathers topics and trends from curated sources to inform naming (no LLM here)
+    * Stores structured trends in DB; used as context for generation
+Entry B (Businesses): Prompt-driven Context + Similar Names
+    * Business owner describes their idea, constraints (tone/length/keywords/TLDs)
+    * System retrieves similar company names and examples from a `company_names` dataset to ground prompts
 2. Domain Name Generation
     * Bot-2 generates creative and brandable domain names
-    * Fine-tuned on crawled data
-    * Uses detailed prompts, keywords, and trends
-3. Scoring of Generated Domain Names
+    * Uses detailed prompts, categories/keywords, trends and examples
+    * Users can select which LLM model powers each generation run
+3. Dedupe and Filtering
+    * Remove near-duplicates, enforce constraints (length, style, restricted patterns)
+4. Scoring of Generated Domain Names
     * Bot-3 scores domain names based on:
         * Memorability
         * Pronounceability
         * Length
         * Brandability
-4. Domain Name Availability Verification
-    * First checks DNS (free)
-    * Then verifies through domain registrar APIs
-5. Domain Discovery Console
+    * Hybrid approach: heuristics + LLM judge with clear rubric
+    * Scoring model choice is user-configurable per job
+5. Domain Name Availability Verification
+    * For now: verify via registrar API (WhoAPI) directly
+    * Future: add DNS heuristics and negative cache to minimize paid checks
+    * Small batches may run synchronously; larger batches run as background jobs
+6. Domain Discovery Console
     * User-friendly dashboard to:
         * Review generated domain names
         * View scores
         * Check availability status
         * View crawled domain/company information
-6. Domain Name Purchase
+7. Domain Name Purchase
     * Available domains visible with scores and rankings
     * Human-in-the-loop for evaluation and purchase decisions
-7. Domain Name Resale
+8. Domain Name Resale
     * Create webpage for sale
     * Post in domain resale marketplaces
-8. Trademark Conflict Flagging
+9. Trademark Conflict Flagging
     * Verify if names are trademarked
+10. Background Jobs & Progress
+    * Long-running tasks (generation, availability batches) run via Celery workers
+    * API returns job/batch ids and progress can be polled from the Console
 
 Target TLDs
     * Primary: .com and .ai domain names
     * Additional TLDs may be considered for specific categories/keywords
 
 Multi-Agent Workflow
-1. Start → Initialize
-2. Market trends research bot - Crawls and adds examples to database
-3. Domain name generation bot - Generates 10-20 domain names per category
-4. DNS initial check - Free availability check
-5. Availability API check - Paid verification if needed
-6. Domain name scoring bot - Scores based on quality attributes
-7. Process available domains - Human reviews through dashboard
-8. Buy domain name - Human decision - Human in the Loop step
-9. Create website for sale or Post in auction websites
-10. End
+1. Start → Initialize
+2. Entry selection
+    * If business prompt present → gather similar names/examples
+    * Else (investor flow) → gather trends/topics
+    * If both present → merge contexts (dedupe)
+3. Domain name generation → produce candidate list
+4. Dedupe and filter → enforce constraints and remove near-duplicates
+5. Scoring → heuristics + LLM judge; compute overall score
+6. Availability checks → registrar API now; add DNS heuristics later
+7. Persist results and checkpoints → DB rows for domains, evaluations, availability
+8. Review in Console → filters, sorting, details
+9. Purchase decision (human-in-the-loop)
+10. Optional resale listing and landing page
+11. End
 
 Technology Stack
 * Multi-Agent Framework: LangGraph (Python)
@@ -91,6 +106,8 @@ Technology Stack
 * Dashboard: Next.js (TypeScript, App Router) + Tailwind/shadcn
 * Database: Supabase (Postgres)
 * API: FastAPI (Python)
+* Background processing: Celery + Redis; job ids for polling
+* Auth: Supabase JWT (Console issues, API verifies)
 * API Integrations: Registrar APIs (WhoAPI primary; optionally WhoisJSONAPI, Domain‑checker7)
 
 Competitor Analysis
@@ -110,6 +127,7 @@ Sources for Training:
     * Crunchbase (potentially $99/month for 5000 rows)
     * YCombinator list of startups
     * Extract: domain name, company name, description, industry, TLD, tags
+    * Ad-hoc scrapers live under `services/api/scripts/scrapers/` and populate a `company_names` dataset
 2. Domain Marketplaces:
     * Historical sales data
     * High-priced domain examples with metadata
@@ -142,7 +160,7 @@ Domain Availability Checking:
 * WhoAPI: $99 for 1M requests/month
 * WhoisJSONAPI: $50 for 2M requests/month
 * Domain‑checker7: $10–125/month depending on volume
-* Strategy: Use DNS lookup first (free), then API confirmation
+* Strategy (current → future): call registrar API (WhoAPI) now for availability; add DNS heuristics and negative cache later to reduce paid calls
 
 Domain Purchase/Registration:
 * ionos.com
@@ -172,5 +190,4 @@ Future Enhancements
 
 
 This comprehensive requirements document provides the foundation for developing a multi-agent system that automates the domain name investment process from research to resale.
-
 

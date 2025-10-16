@@ -7,6 +7,7 @@ Backend Integration
 - Auth: obtain a Supabase JWT on the client; include `Authorization: Bearer <token>` in API requests.
 - Do not create a separate Next.js API layer for core resources; call FastAPI directly to keep one source of truth and consistent contracts.
 - Types: consume `packages/shared-ts` types generated from the FastAPI OpenAPI/JSON Schema.
+- Job creation form should surface LiteLLM model choices (generation + scoring) using the allowlisted model names returned by the API.
 
 Use the following theme for shadcn:
 

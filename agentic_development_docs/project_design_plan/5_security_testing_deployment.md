@@ -42,6 +42,7 @@ All checks recorded in `availability_checks` with raw payload for auditability.
 - Request input validation (Pydantic & Zod), output strict models
 - Rate limiting per user/IP for sensitive endpoints
 - Audit trail via `agent_runs` and Langfuse traces
+- LiteLLM model usage constrained by a configurable allowlist; API rejects model names outside this approved set to prevent unsanctioned vendor calls
 
 ## 11. Testing Strategy
 

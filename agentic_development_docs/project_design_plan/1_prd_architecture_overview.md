@@ -16,8 +16,8 @@ High‑level components:
 - Secrets/Config: `.env` files in dev, environment variables in prod
 
 Flow (simplified):
-1) User triggers a generation job from Console → 2) API authenticates via Supabase JWT, records `jobs.created_by` with the requester, creates Job row and enqueues Celery task → 3) Agents Service (LangGraph) runs the multi‑agent workflow → 4) Results and traces persist to Postgres (+ Langfuse) → 5) Console streams job status and displays candidates, scores, and availability.
-Small availability batches (≤ 50) run synchronously in the API; larger batches enqueue a Celery job and expose a batch id for polling.
+1) User triggers a generation job from Console → 2) API authenticates via Supabase JWT, records `jobs.created_by` with the requester, creates Job row and (currently) schedules the LangGraph run in-process via `asyncio.create_task` → 3) Agents Service (LangGraph) runs the multi‑agent workflow → 4) Results persist to Postgres (Langfuse integration is deferred) → 5) Console streams job status and displays candidates, scores, and availability.
+Small availability batches (≤ 50) run synchronously in the API; larger batches will migrate to Celery once long-running steps are introduced.
 
 ## 2. Tech Stack
 
@@ -44,8 +44,9 @@ Small availability batches (≤ 50) run synchronously in the API; larger batches
 - Agents/LLM
   - LangGraph >= 0.6 - latest version - python implementation
   - Tool calling pattern with httpx, DNS resolver, registrar SDK clients
-  - Langfuse for prompt/version management, traces and evaluations
-  - Pluggable LLM provider (e.g., OpenAI/Claude/Grok/OpenRouter) via env vars
+  - Langfuse for prompt/version management, traces and evaluations *(TODO; tracked in implementation notes)*
+  - LiteLLM unifies calls across OpenAI/Claude/Groq/etc.; models selectable per job with an allowlist gate in settings
+  - Scored by an LLM judge returning integer scores between 1 and 10;
 
 - Data
   - Postgres (Supabase hosted) with `pgvector`
@@ -64,16 +65,19 @@ namesmith/
 ├─ apps/
 │  └─ web/                      # Next.js console (App Router)
 ├─ services/
-│  ├─ api/                      # FastAPI app (REST)
+│  ├─ api/                      # FastAPI app (REST) + Celery worker/beat entrypoints
+│  │  ├─ migrations/            # Alembic migrations (owned by API)
+│  │  └─ scripts/               # DB/ETL/seed scripts and one-offs
+│  │     └─ scrapers/           # Company-name ingestion (YC, Crunchbase, etc.)
 │  └─ agents/                   # LangGraph workflows, tools, runners
 ├─ packages/
 │  ├─ shared-ts/                # Shared TS types (client contracts)
 │  └─ shared-py/                # Shared Pydantic models, enums
 ├─ infra/
 │  ├─ docker/                   # Dockerfiles, compose, dev stacks
-│  ├─ migrations/               # Alembic migrations
 │  └─ ops/                      # Deployment IaC, env templates
-├─ project_development_plan/    # Specs, plans (this doc)
+├─ agentic_development_docs/
+│  └─ project_design_plan/      # Specs, plans (this doc)
 └─ old_code/                    # Frozen legacy reference (do not modify)
 ```
 
@@ -82,8 +86,8 @@ Naming rule from rules1.md: use `namesmith` for code identifiers; keep display t
 
 
 Key design points:
-- Use LangGraph subgraphs to isolate `score_names` and `availability` branches; run in parallel where safe
 - Persist checkpoints to Postgres (via a simple CheckpointStore) for resumability
 - Tool nodes for DNS check, registrar clients, embeddings, and prompt calls
 - Retries with exponential backoff and vendor‑specific rate limiting
 - Single API surface: FastAPI serves all backend routes; the Next.js Console interacts with it over HTTP using shared contracts (no separate TS API service)
+- Availability precheck/human notify stages are deferred; the graph currently uses a domain name availability check node.

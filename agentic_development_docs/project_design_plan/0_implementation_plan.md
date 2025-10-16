@@ -1,6 +1,7 @@
 # Namesmith Implementation Plan (Mono‑Repo)
 
 This plan sequences the work to deliver the new mono‑repo with an updated LangGraph‑based agents service, FastAPI backend, and a Next.js console. It avoids any changes to `old_code/` while re‑implementing required features in the new structure.
+Note: This is initial high level implementation plan, it could have been changed with the other documents in project_design_plan which has the implementation plan and project design document.
 
 ## Guiding Constraints
 
@@ -25,13 +26,13 @@ apps/
   web/
 services/
   api/
+    migrations/
   agents/
 packages/
   shared-ts/
   shared-py/
 infra/
   docker/
-  migrations/
   ops/
 project_development_plan/
 old_code/
@@ -79,6 +80,7 @@ Deliverables:
   - Nodes: gather_trends, generate_names, dedupe_and_filter, score_names, availability_precheck, availability_verify, persist_results
   - Graph builder with subgraphs and checkpoint/persistence hooks
   - Provider abstraction for LLMs and registrar APIs
+  - LiteLLM-backed generation + scoring providers with per-job model selection and allowlist validation
 - Minimal in‑memory runner + Postgres persistence adapter
 
 Acceptance:
@@ -199,7 +201,6 @@ GET `/v1/domains`
 
 - Keep legacy as reference only; do not import runtime code
 - Recreate UI flows (domains table, filters) using new API contracts
-- If needed, write one‑off ETL scripts to import any seed data
 
 ## Risks & Mitigations
 

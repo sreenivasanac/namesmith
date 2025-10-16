@@ -1,0 +1,129 @@
+"""State definitions for Namesmith agent workflows."""
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Literal, Optional
+from uuid import UUID
+
+from pydantic import BaseModel, Field, field_validator, model_validator
+from typing import TypedDict
+
+from packages.shared_py.namesmith_schemas.base import EntryPath
+
+
+class Trend(BaseModel):
+    title: str
+    summary: Optional[str] = None
+    tags: list[str] = Field(default_factory=list)
+    source: Optional[str] = None
+
+
+class CompanyExample(BaseModel):
+    name: str
+    domain: Optional[str] = None
+    description: Optional[str] = None
+    categories: list[str] = Field(default_factory=list)
+    source: Optional[str] = None
+    score: Optional[float] = None
+
+
+class Candidate(BaseModel):
+    label: str
+    tld: str
+    display_name: Optional[str] = None
+    reasoning: Optional[str] = None
+
+    @property
+    def full_domain(self) -> str:
+        return f"{self.label.lower()}.{self.tld.lower()}"
+
+    @model_validator(mode="after")
+    def _normalize(self) -> "Candidate":
+        self.label = (self.label or "").lower()
+        self.tld = (self.tld or "").lower().lstrip(".")
+        if not self.display_name and self.label:
+            self.display_name = self.label.capitalize()
+        return self
+
+
+class ScoredCandidate(Candidate):
+    memorability: float
+    pronounceability: float
+    brandability: float
+    overall: float
+    rubric_version: str = "v1"
+    rationale: Optional[str] = None
+
+    @field_validator("memorability", "pronounceability", "brandability", "overall")
+    @classmethod
+    def _clamp_scores(cls, v: float) -> float:
+        try:
+            v = float(v)
+        except (TypeError, ValueError):
+            v = 10.0
+        if v < 1:
+            return 1.0
+        if v > 10:
+            return 10.0
+        return float(int(round(v)))
+
+    @field_validator("rationale")
+    @classmethod
+    def _trim_rationale(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        s = str(v).strip()
+        return s[:200] if len(s) > 200 else s
+
+
+class AvailabilityResult(BaseModel):
+    full_domain: str
+    status: Literal["available", "registered", "unknown", "error"]
+    registrar: Optional[str] = None
+    checked_at: datetime = Field(default_factory=datetime.utcnow)
+    raw_payload: Optional[dict] = None
+
+
+class GenerationInputs(BaseModel):
+    job_id: UUID
+    user_id: Optional[UUID] = None
+    entry_path: EntryPath
+    topic: Optional[str] = None
+    prompt: Optional[str] = None
+    categories: list[str] = Field(default_factory=list)
+    tlds: list[str] = Field(default_factory=list)
+    count: int = 20
+    generation_model: Optional[str] = None
+    scoring_model: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _normalize_tlds(self) -> "GenerationInputs":
+        self.tlds = [tld.lower().lstrip(".") for tld in self.tlds]
+        return self
+
+
+class GenerationState(BaseModel):
+    inputs: GenerationInputs
+    trends: list[Trend] = Field(default_factory=list)
+    company_examples: list[CompanyExample] = Field(default_factory=list)
+    candidates: list[Candidate] = Field(default_factory=list)
+    filtered: list[Candidate] = Field(default_factory=list)
+    scored: list[ScoredCandidate] = Field(default_factory=list)
+    availability: list[AvailabilityResult] = Field(default_factory=list)
+    progress: dict[str, int] = Field(default_factory=dict)
+
+
+class PersistResult(BaseModel):
+    job_id: UUID
+    domain_ids: list[UUID]
+
+
+class GenerationStateDict(TypedDict, total=False):
+    inputs: GenerationInputs
+    trends: list[Trend]
+    company_examples: list[CompanyExample]
+    candidates: list[Candidate]
+    filtered: list[Candidate]
+    scored: list[ScoredCandidate]
+    availability: list[AvailabilityResult]
+    progress: dict[str, int]

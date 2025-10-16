@@ -66,7 +66,7 @@ Availability
   - Behavior: small payloads (<= 50) may be processed synchronously; larger requests enqueue a job and return batch id.
   - Response (sync): `{ results: { full_domain: string, status: 'available'|'registered'|'unknown'|'error' }[] }`
   - Response (async): `{ batch_id: string }`
-  - Order & audit: DNS heuristics before registrar provider checks; each check recorded in `availability_checks` with raw payload and optional TTL.
+  - Order & audit: DNS heuristics before registrar provider checks (this is not implemented in initial version); each check recorded in `availability_checks` with raw payload and optional TTL.
 
 - GET `/v1/availability/batches/{batch_id}`
   - Response: `{ status: 'queued'|'running'|'succeeded'|'failed', results?: { full_domain: string, status: string }[] }`
@@ -91,18 +91,18 @@ SEO Analysis
 
 Jobs (Agents)
 - POST `/v1/jobs/generate`
-  - Body: `{ entry_path: 'investor'|'business', topic?: string, prompt?: string, categories?: string[], tlds?: string[], count?: number }`
-  - Behavior: extracts `user_id` from JWT and creates a job row with `created_by = user_id`, `type = 'generate'`, `entry_path`, and `params` containing input fields. Enqueues a Celery task to run the LangGraph pipeline.
-  - Response: `{ job_id: string }`
+  - Body: `{ entry_path: 'investor'|'business', topic?: string, prompt?: string, categories?: string[], tlds?: string[], count?: number, generation_model?: string, scoring_model?: string }`
+  - Behavior: extracts `user_id` from JWT and creates a job row with `created_by = user_id`, `type = 'generate'`, `entry_path`, and `params` containing input fields. Model names are validated against an allowlist (when configured) and persisted into `jobs.params` so downstream responses can echo the active LLM configuration. During the current milestone the LangGraph run executes in-process via `asyncio.create_task`; longer jobs will transition to Celery workers.
+  - Response: `{ id, type, entry_path, status, created_at, generation_model?, scoring_model?, progress: {} }`
 
 - GET `/v1/jobs`
   - Query: `status?`, `cursor?`, `limit?`
   - Behavior: returns jobs created by the requesting user (admins can list all).
-  - Response: `{ items: { id, type, entry_path, status, created_at, finished_at }[], next_cursor?: string }`
+  - Response: `{ items: { id, type, entry_path, status, created_at, finished_at, generation_model?, scoring_model? }[], next_cursor?: string }`
 
 - GET `/v1/jobs/{job_id}`
-  - Behavior: authorizes access (owner or admin). Aggregates progress counters from `agent_runs` where available.
-  - Response: `{ id, type, entry_path, status: 'queued'|'running'|'succeeded'|'failed'|'partial', progress?: { generated?: number, scored?: number, checked?: number }, error?: string, created_at, finished_at }`
+  - Behavior: authorizes access (owner or admin). Aggregates progress counters from `agent_runs` where available and persists them back into `jobs.params.progress` so subsequent reads (including polling from the console) surface live counters even if worker updates lag.
+  - Response: `{ id, type, entry_path, status: 'queued'|'running'|'succeeded'|'failed'|'partial', progress?: { generated?: number, scored?: number, checked?: number }, error?: string, created_at, finished_at, generation_model?: string, scoring_model?: string }`
 
 Security
 - All endpoints require Supabase JWT; role checks apply to write endpoints (editor/admin).
