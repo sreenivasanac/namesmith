@@ -6,6 +6,7 @@ import type { Domain } from "@namesmith/shared-ts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ChevronDown, ChevronUp, ChevronsUpDown } from "lucide-react";
 
 function AvailabilityBadge({ status }: { status?: string | null }) {
   if (!status) {
@@ -24,29 +25,58 @@ function AvailabilityBadge({ status }: { status?: string | null }) {
   return <Badge variant="outline">{status}</Badge>;
 }
 
+type SortKey = "overall_score" | "label" | "length" | "availability" | "created_at";
+
 interface DomainTableProps {
   domains: Domain[];
   onSelect(domain: Domain): void;
 }
 
 export function DomainTable({ domains, onSelect }: DomainTableProps) {
-  const [sortKey, setSortKey] = useState<keyof Domain | "overall_score">("overall_score");
+  const [sortKey, setSortKey] = useState<SortKey>("overall_score");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  const getSortValue = (domain: Domain, key: SortKey): number | string | null => {
+    if (key === "overall_score") {
+      return domain.evaluation?.overall_score ?? 0;
+    }
+
+    if (key === "label") {
+      return (domain.display_name ?? domain.full_domain ?? "").toLowerCase();
+    }
+
+    if (key === "availability") {
+      const status = domain.availability?.status?.toLowerCase();
+      if (status === "available") return 0;
+      if (status === "registered") return 1;
+      if (status === "error") return 2;
+      return 3;
+    }
+
+    if (key === "created_at") {
+      const timestamp = new Date(domain.created_at).getTime();
+      return Number.isNaN(timestamp) ? null : timestamp;
+    }
+
+    if (key === "length") {
+      return domain.length;
+    }
+
+    return null;
+  };
+
+  const getSortIcon = (key: SortKey) => {
+    if (sortKey !== key) {
+      return <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />;
+    }
+    return sortDir === "asc" ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
+  };
 
   const sorted = useMemo(() => {
     const copy = [...domains];
     copy.sort((a, b) => {
-      let aValue: number | string | null = null;
-      let bValue: number | string | null = null;
-      if (sortKey === "overall_score") {
-        aValue = a.evaluation?.overall_score ?? 0;
-        bValue = b.evaluation?.overall_score ?? 0;
-      } else {
-        const aAny = a[sortKey];
-        const bAny = b[sortKey];
-        aValue = typeof aAny === "number" || typeof aAny === "string" ? aAny : null;
-        bValue = typeof bAny === "number" || typeof bAny === "string" ? bAny : null;
-      }
+      const aValue = getSortValue(a, sortKey);
+      const bValue = getSortValue(b, sortKey);
       if (aValue === bValue) return 0;
       if (aValue == null) return sortDir === "asc" ? -1 : 1;
       if (bValue == null) return sortDir === "asc" ? 1 : -1;
@@ -60,12 +90,20 @@ export function DomainTable({ domains, onSelect }: DomainTableProps) {
     return copy;
   }, [domains, sortDir, sortKey]);
 
-  const toggleSort = (key: typeof sortKey) => {
+  const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
       setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
     } else {
       setSortKey(key);
-      setSortDir("desc");
+      if (key === "availability") {
+        setSortDir("asc");
+      } else if (key === "created_at") {
+        setSortDir("desc");
+      } else if (key === "label") {
+        setSortDir("asc");
+      } else {
+        setSortDir("desc");
+      }
     }
   };
 
@@ -75,18 +113,37 @@ export function DomainTable({ domains, onSelect }: DomainTableProps) {
         <TableHeader>
           <TableRow>
             <TableHead>
-              <button type="button" className="flex items-center gap-2" onClick={() => toggleSort("label")}>Domain</button>
+              <button type="button" className="flex items-center gap-2" onClick={() => toggleSort("label")}>
+                Domain
+                {getSortIcon("label")}
+              </button>
             </TableHead>
             <TableHead>TLD</TableHead>
             <TableHead>
-              <button type="button" className="flex items-center gap-2" onClick={() => toggleSort("length")}>Length</button>
+              <button type="button" className="flex items-center gap-2" onClick={() => toggleSort("length")}>
+                Length
+                {getSortIcon("length")}
+              </button>
             </TableHead>
             <TableHead>Model</TableHead>
-            <TableHead>Availability</TableHead>
             <TableHead>
-              <button type="button" className="flex items-center gap-2" onClick={() => toggleSort("overall_score")}>Overall score</button>
+              <button type="button" className="flex items-center gap-2" onClick={() => toggleSort("availability")}>
+                Availability
+                {getSortIcon("availability")}
+              </button>
             </TableHead>
-            <TableHead>Created</TableHead>
+            <TableHead>
+              <button type="button" className="flex items-center gap-2" onClick={() => toggleSort("overall_score")}>
+                Overall score
+                {getSortIcon("overall_score")}
+              </button>
+            </TableHead>
+            <TableHead>
+              <button type="button" className="flex items-center gap-2" onClick={() => toggleSort("created_at")}>
+                Created
+                {getSortIcon("created_at")}
+              </button>
+            </TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
