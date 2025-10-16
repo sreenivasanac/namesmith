@@ -3,7 +3,8 @@
 import { create } from "zustand";
 import type { DomainFiltersState, RangeFilter } from "@/types/filters";
 
-const DEFAULT_RANGE: RangeFilter = { min: 1, max: 10 };
+// Create fresh range objects to avoid shared references across fields
+const makeDefaultRange = (): RangeFilter => ({ min: 1, max: 10 });
 
 type RangeKeys = "memorability" | "pronounceability" | "brandability" | "overall" | "seoKeywordRelevance";
 
@@ -23,11 +24,11 @@ export const useFilterStore = create<FilterStore>((set) => ({
   tld: [],
   agentModel: [],
   industry: [],
-  memorability: DEFAULT_RANGE,
-  pronounceability: DEFAULT_RANGE,
-  brandability: DEFAULT_RANGE,
-  overall: DEFAULT_RANGE,
-  seoKeywordRelevance: DEFAULT_RANGE,
+  memorability: makeDefaultRange(),
+  pronounceability: makeDefaultRange(),
+  brandability: makeDefaultRange(),
+  overall: makeDefaultRange(),
+  seoKeywordRelevance: makeDefaultRange(),
   setSearch: (value) => set({ search: value }),
   setStatus: (values) => set({ status: values }),
   setTld: (values) => set({ tld: values }),
@@ -41,10 +42,10 @@ export const useFilterStore = create<FilterStore>((set) => ({
       tld: [],
       agentModel: [],
       industry: [],
-      memorability: DEFAULT_RANGE,
-      pronounceability: DEFAULT_RANGE,
-      brandability: DEFAULT_RANGE,
-      overall: DEFAULT_RANGE,
-      seoKeywordRelevance: DEFAULT_RANGE,
+      memorability: makeDefaultRange(),
+      pronounceability: makeDefaultRange(),
+      brandability: makeDefaultRange(),
+      overall: makeDefaultRange(),
+      seoKeywordRelevance: makeDefaultRange(),
     }),
 }));

@@ -15,13 +15,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 const PAGE_SIZE = 50;
 
+function sortArray<T>(arr: T[]): T[] {
+  return [...arr].sort((a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0));
+}
+
 function buildQueryParams(state: ReturnType<typeof useFilterStore.getState>): DomainQueryParams {
   const params: DomainQueryParams = { limit: PAGE_SIZE };
   if (state.search) params.search = state.search;
-  if (state.status.length) params.status = state.status;
-  if (state.tld.length) params.tld = state.tld;
-  if (state.agentModel.length) params.agent_model = state.agentModel;
-  if (state.industry.length) params.category = state.industry;
+  if (state.status.length) params.status = sortArray(state.status);
+  if (state.tld.length) params.tld = sortArray(state.tld);
+  if (state.agentModel.length) params.agent_model = sortArray(state.agentModel);
+  if (state.industry.length) params.category = sortArray(state.industry);
   if (state.memorability.min !== 1 || state.memorability.max !== 10) {
     params.memorability_min = state.memorability.min;
     params.memorability_max = state.memorability.max;
@@ -52,15 +56,75 @@ interface DomainExplorerProps {
 export function DomainExplorer({ initialData }: DomainExplorerProps) {
   const token = useAccessToken();
   const [selectedDomain, setSelectedDomain] = useState<Domain | null>(null);
-  const filterState = useFilterStore();
+  
+  // Subscribe to individual filter values to trigger re-renders
+  const search = useFilterStore((state) => state.search);
+  const status = useFilterStore((state) => state.status);
+  const tld = useFilterStore((state) => state.tld);
+  const agentModel = useFilterStore((state) => state.agentModel);
+  const industry = useFilterStore((state) => state.industry);
+  const memorability = useFilterStore((state) => state.memorability);
+  const pronounceability = useFilterStore((state) => state.pronounceability);
+  const brandability = useFilterStore((state) => state.brandability);
+  const overall = useFilterStore((state) => state.overall);
+  const seoKeywordRelevance = useFilterStore((state) => state.seoKeywordRelevance);
 
-  const queryParams = useMemo(() => buildQueryParams(filterState), [filterState]);
+  const filterState = {
+    search,
+    status,
+    tld,
+    agentModel,
+    industry,
+    memorability,
+    pronounceability,
+    brandability,
+    overall,
+    seoKeywordRelevance,
+  };
+
+  const queryParams = useMemo(() => buildQueryParams(filterState), [
+    search,
+    status,
+    tld,
+    agentModel,
+    industry,
+    memorability.min,
+    memorability.max,
+    pronounceability.min,
+    pronounceability.max,
+    brandability.min,
+    brandability.max,
+    overall.min,
+    overall.max,
+    seoKeywordRelevance.min,
+    seoKeywordRelevance.max,
+  ]);
 
   const [metadata, setMetadata] = useState<DomainFiltersMetadata | undefined>(initialData.filters ?? undefined);
+
+  // Track if we've used initialData
+  const [hasUsedInitialData, setHasUsedInitialData] = useState(false);
+  
+  // Only use initialData for the first query (no filters applied)
+  const shouldUseInitialData = 
+    !hasUsedInitialData && 
+    !search &&
+    status.length === 0 &&
+    tld.length === 0 &&
+    agentModel.length === 0 &&
+    industry.length === 0 &&
+    memorability.min === 1 && memorability.max === 10 &&
+    pronounceability.min === 1 && pronounceability.max === 10 &&
+    brandability.min === 1 && brandability.max === 10 &&
+    overall.min === 1 && overall.max === 10 &&
+    seoKeywordRelevance.min === 1 && seoKeywordRelevance.max === 10;
 
   const query = useInfiniteQuery({
     queryKey: queryKeys.domains(queryParams),
     queryFn: async ({ pageParam }) => {
+      if (!hasUsedInitialData) {
+        setHasUsedInitialData(true);
+      }
       if (!token) {
         throw new Error("Missing token");
       }
@@ -69,10 +133,9 @@ export function DomainExplorer({ initialData }: DomainExplorerProps) {
     getNextPageParam: (lastPage) => lastPage.next_cursor ?? null,
     enabled: Boolean(token),
     initialPageParam: null as string | null,
-    initialData: initialData
-      ? { pageParams: [null], pages: [initialData] }
-      : undefined,
-    staleTime: 30_000,
+    ...(shouldUseInitialData && {
+      initialData: { pageParams: [null], pages: [initialData] },
+    }),
   });
 
   useEffect(() => {
