@@ -6,6 +6,7 @@ import type { Domain } from "@namesmith/shared-ts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronDown, ChevronUp, ChevronsUpDown } from "lucide-react";
 
 function AvailabilityBadge({ status }: { status?: string | null }) {
@@ -30,9 +31,10 @@ type SortKey = "overall_score" | "label" | "length" | "availability" | "created_
 interface DomainTableProps {
   domains: Domain[];
   onSelect(domain: Domain): void;
+  isLoading?: boolean;
 }
 
-export function DomainTable({ domains, onSelect }: DomainTableProps) {
+export function DomainTable({ domains, onSelect, isLoading = false }: DomainTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("overall_score");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
@@ -107,6 +109,8 @@ export function DomainTable({ domains, onSelect }: DomainTableProps) {
     }
   };
 
+  const loadingRows = Array.from({ length: 5 });
+
   return (
     <div className="space-y-4">
       <Table>
@@ -148,7 +152,20 @@ export function DomainTable({ domains, onSelect }: DomainTableProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sorted.map((domain) => (
+          {isLoading
+            ? loadingRows.map((_, index) => (
+                <TableRow key={`loading-${index}`}>
+                  <TableCell className="font-medium"><Skeleton className="h-4 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="h-8 w-24" /></TableCell>
+                </TableRow>
+              ))
+            : sorted.map((domain) => (
             <TableRow key={domain.id} className="cursor-pointer" onClick={() => onSelect(domain)}>
               <TableCell className="font-medium">{domain.display_name ?? domain.full_domain}</TableCell>
               <TableCell>.{domain.tld}</TableCell>
@@ -168,7 +185,9 @@ export function DomainTable({ domains, onSelect }: DomainTableProps) {
           ))}
         </TableBody>
       </Table>
-      {sorted.length === 0 ? <p className="text-sm text-muted-foreground">No domains match the current filters.</p> : null}
+      {!isLoading && sorted.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No domains match the current filters.</p>
+      ) : null}
     </div>
   );
 }
