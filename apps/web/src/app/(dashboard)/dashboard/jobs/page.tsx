@@ -1,23 +1,14 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { createSupabaseServerClient } from "@/lib/auth/supabase-server";
 import { fetchJobs } from "@/lib/api/jobs";
 import { JobTable } from "@/features/jobs/job-table";
+import { getTokenFromSession, requireSession } from "@/lib/auth/session.server";
 
 export const dynamic = "force-dynamic";
 
 export default async function JobsPage() {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (!session) {
-    redirect("/login");
-  }
-
-  const token = session.access_token;
+  const session = await requireSession();
+  const token = getTokenFromSession(session);
   const initialJobs = token ? await fetchJobs(token, new URLSearchParams()) : { items: [], next_cursor: null };
 
   return (

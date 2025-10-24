@@ -1,19 +1,11 @@
-import { redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/auth/supabase-server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CreateJobForm } from "@/features/jobs/job-form";
+import { requireSession } from "@/lib/auth/session.server";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewJobPage() {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (!session) {
-    redirect("/login");
-  }
+  await requireSession();
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">

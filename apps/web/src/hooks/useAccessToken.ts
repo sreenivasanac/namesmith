@@ -1,29 +1,42 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createSupabaseBrowserClient } from "@/lib/auth/supabase-browser";
+
+import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
+
+function readSessionToken(): string | null {
+  if (typeof document === "undefined") {
+    return null;
+  }
+  const prefix = `${SESSION_COOKIE_NAME}=`;
+  const entry = document.cookie
+    .split("; ")
+    .find((cookie) => cookie.startsWith(prefix));
+  if (!entry) {
+    return null;
+  }
+  const token = entry.slice(prefix.length);
+  return token || null;
+}
 
 export function useAccessToken(): string | null {
-  const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [supabase] = useState(() => createSupabaseBrowserClient());
+  const [token, setToken] = useState<string | null>(() => readSessionToken());
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setAccessToken(session?.access_token ?? null);
-    });
+    const updateToken = () => {
+      setToken(readSessionToken());
+    };
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setAccessToken(session?.access_token ?? null);
-    });
+    updateToken();
+
+    window.addEventListener("focus", updateToken);
+    document.addEventListener("visibilitychange", updateToken);
 
     return () => {
-      subscription.unsubscribe();
+      window.removeEventListener("focus", updateToken);
+      document.removeEventListener("visibilitychange", updateToken);
     };
-  }, [supabase]);
+  }, []);
 
-  return accessToken;
+  return token;
 }

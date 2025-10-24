@@ -60,7 +60,6 @@ export function DomainDetailSheet({ domain, onClose }: DomainDetailSheetProps) {
                 <p>Checked: {format(new Date(domain.availability.created_at), "PPP p")}</p>
               ) : null}
               <div className="flex gap-2 pt-2">
-                <Button variant="outline" size="sm" disabled>Re-check soon</Button>
                 <Button variant="ghost" size="sm" asChild>
                   <a href={`https://who.is/whois/${domain.full_domain}`} target="_blank" rel="noreferrer">Open WHOIS</a>
                 </Button>

@@ -6,7 +6,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routers import domains, health, jobs
+from .routers import auth, domains, health, jobs
 from .settings import settings
 
 logger = logging.getLogger(__name__)
@@ -22,6 +22,7 @@ app.add_middleware(
 )
 
 app.include_router(health.router)
+app.include_router(auth.router)
 app.include_router(jobs.router)
 app.include_router(domains.router)
 

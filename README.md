@@ -26,6 +26,10 @@ Python backend services for the Namesmith multi-agent domain generation system.
    ```bash
    uv run python -m services.agents.run_local --topic "ai analytics" --count 5
    ```
+5. Start the web frontend for local development:
+   ```bash
+   pnpm --dir apps/web dev
+   ```
 
 The API automatically schedules the LangGraph agent when `/v1/jobs/generate` is called.
 

@@ -1,23 +1,14 @@
-import { redirect } from "next/navigation";
 import type { JobListResponse } from "@namesmith/shared-ts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { createSupabaseServerClient } from "@/lib/auth/supabase-server";
 import { fetchJobs } from "@/lib/api/jobs";
 import { JobTable } from "@/features/jobs/job-table";
+import { getTokenFromSession, requireSession } from "@/lib/auth/session.server";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  if (!session) {
-    redirect("/login");
-  }
-
-  const token = session.access_token;
+  const session = await requireSession();
+  const token = getTokenFromSession(session);
   const params = new URLSearchParams({ limit: "5" });
   
   let initialJobs: JobListResponse = { items: [], next_cursor: null };
