@@ -1,4 +1,4 @@
-const requiredClientEnv = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "NEXT_PUBLIC_API_URL"] as const;
+const requiredClientEnv = ["NEXT_PUBLIC_API_URL"] as const;
 
 type ClientEnvKeys = (typeof requiredClientEnv)[number];
 

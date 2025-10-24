@@ -10,13 +10,14 @@ from .domains import (
     link_domain_to_job,
 )
 from .jobs import create_job, get_job, list_jobs, record_agent_run, update_job_status
-from .users import get_user_by_id, upsert_user
+from .users import ensure_user_by_email, get_user_by_email, get_user_by_id, upsert_user
 
 __all__ = [
     "create_job",
     "get_domain_by_id",
     "get_domain_filters_metadata",
     "get_job",
+    "get_user_by_email",
     "get_user_by_id",
     "list_domains",
     "list_jobs",
@@ -27,5 +28,6 @@ __all__ = [
     "upsert_domain",
     "upsert_evaluation",
     "link_domain_to_job",
+    "ensure_user_by_email",
     "upsert_user",
 ]

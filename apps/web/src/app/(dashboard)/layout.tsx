@@ -1,23 +1,14 @@
-import { redirect } from "next/navigation";
 import { ReactNode } from "react";
-import { createSupabaseServerClient } from "@/lib/auth/supabase-server";
 import { BRAND_NAME } from "@/lib/utils";
 import Link from "next/link";
 import { DashboardHeader } from "@/components/layout/dashboard-header";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
 import { AppProviders } from "@/providers/app-providers";
+import { requireSession } from "@/lib/auth/session.server";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const userEmail = user.email ?? "user";
+  const session = await requireSession();
+  const userEmail = session.user.email ?? "user";
 
   return (
     <AppProviders>

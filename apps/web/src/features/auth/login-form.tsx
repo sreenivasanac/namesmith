@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createSupabaseBrowserClient } from "@/lib/auth/supabase-browser";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,7 +22,6 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ className }: LoginFormProps) {
-  const [supabase] = useState(() => createSupabaseBrowserClient());
   const router = useRouter();
   const {
     register,
@@ -34,59 +32,39 @@ export function LoginForm({ className }: LoginFormProps) {
     defaultValues: { email: "" },
   });
   const [loading, setLoading] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
 
   const onSubmit = handleSubmit(async (values) => {
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signInWithOtp({
-        email: values.email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/api/auth/callback`,
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
+        body: JSON.stringify({ email: values.email }),
       });
-      if (error) {
-        throw error;
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || "Unable to sign in");
       }
-      setEmailSent(true);
-      toast.success("Check your email for the login link!");
+
+      toast.success("Signed in successfully");
+      router.replace("/dashboard");
+      router.refresh();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to send login link";
+      const message = error instanceof Error ? error.message : "Unable to sign in";
       toast.error(message);
     } finally {
       setLoading(false);
     }
   });
 
-  if (emailSent) {
-    return (
-      <div className={cn("w-full max-w-sm space-y-6 text-center", className)}>
-        <div className="space-y-2">
-          <h1 className="text-2xl font-semibold">Check your email</h1>
-          <p className="text-sm text-muted-foreground">
-            We&apos;ve sent you a magic link to sign in. Click the link in your email to continue.
-          </p>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full"
-          onClick={() => {
-            setEmailSent(false);
-            router.refresh();
-          }}
-        >
-          Send another link
-        </Button>
-      </div>
-    );
-  }
-
   return (
     <form onSubmit={onSubmit} className={cn("w-full max-w-sm space-y-6", className)}>
       <div className="space-y-2 text-center">
         <h1 className="text-2xl font-semibold">Sign in to Namesmith</h1>
-        <p className="text-sm text-muted-foreground">Enter your email to receive a magic link</p>
+        <p className="text-sm text-muted-foreground">Enter your email to continue</p>
       </div>
       <div className="space-y-4">
         <div className="space-y-2 text-left">
@@ -96,7 +74,7 @@ export function LoginForm({ className }: LoginFormProps) {
         </div>
       </div>
       <Button type="submit" className="w-full" disabled={loading}>
-        {loading ? "Sending link..." : "Send magic link"}
+        {loading ? "Signing in..." : "Sign in"}
       </Button>
     </form>
   );
