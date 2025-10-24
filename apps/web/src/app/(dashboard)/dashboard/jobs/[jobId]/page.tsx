@@ -1,8 +1,8 @@
-import { notFound, redirect } from "next/navigation";
-import { createSupabaseServerClient } from "@/lib/auth/supabase-server";
+import { notFound } from "next/navigation";
 import { fetchJob } from "@/lib/api/jobs";
 import { fetchDomains } from "@/lib/api/domains";
 import { JobDetail } from "@/features/jobs/job-detail";
+import { getTokenFromSession, requireSession } from "@/lib/auth/session.server";
 
 interface JobDetailPageProps {
   params: Promise<{ jobId: string }>;
@@ -12,19 +12,8 @@ export const dynamic = "force-dynamic";
 
 export default async function JobDetailPage({ params }: JobDetailPageProps) {
   const { jobId } = await params;
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/login");
-  }
-
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const accessToken = session?.access_token;
+  const session = await requireSession();
+  const accessToken = getTokenFromSession(session);
 
   try {
     const [job, domains] = await Promise.all([
