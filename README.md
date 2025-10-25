@@ -40,7 +40,19 @@ Run the unit tests with:
 uv run pytest
 ```
 
-## Container Images
+## Deployment
+
+For production deployment to a VPS (Hetzner, DigitalOcean, AWS, etc.), see the comprehensive deployment guide:
+
+**📦 [deploy/DEPLOYMENT.md](deploy/DEPLOYMENT.md)**
+
+The guide covers:
+- Fully containerized setup with Docker Compose
+- Nginx reverse proxy with automatic SSL/HTTPS (Let's Encrypt)
+- Database management and backups
+- Monitoring and troubleshooting
+
+### Local Container Testing
 
 - API image (uses `uv sync --frozen --no-dev` inside the image):
   ```bash

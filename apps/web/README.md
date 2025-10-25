@@ -29,3 +29,9 @@ pnpm --dir apps/web start
 ```
 
 Set `NEXT_PUBLIC_API_URL` in `.env.local` (or via the Docker build arg) to point at the deployed API.
+
+## Deployment
+
+For production deployment to a VPS with Docker, Nginx, and SSL, see:
+
+**📦 [../../deploy/DEPLOYMENT.md](../../deploy/DEPLOYMENT.md)**
