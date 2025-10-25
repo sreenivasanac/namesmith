@@ -32,7 +32,6 @@ WORKDIR /app
 
 COPY --from=base /app/apps/web/.next/standalone ./standalone
 COPY --from=base /app/apps/web/.next/static ./standalone/apps/web/.next/static
-COPY --from=base /app/apps/web/public ./standalone/apps/web/public
 
 EXPOSE 3000
 
