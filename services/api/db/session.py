@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 from ..settings import settings
 from .base import Base
 
-
 def create_engine() -> AsyncEngine:
     url = settings.database_url
     if url.startswith("postgresql://"):

@@ -40,6 +40,21 @@ Run the unit tests with:
 uv run pytest
 ```
 
+## Container Images
+
+- API image (uses `uv sync --frozen --no-dev` inside the image):
+  ```bash
+  docker build -f deploy/api.Dockerfile -t namesmith-api .
+  ```
+- Web image (builds via `pnpm --dir apps/web build`):
+  ```bash
+  docker build -f deploy/web.Dockerfile -t namesmith-web .
+  ```
+- Compose stack (expects `deploy/app.env` and `deploy/.env` to be populated):
+  ```bash
+  docker compose --env-file deploy/.env -f deploy/docker-compose.yaml up -d --build
+  ```
+
 ## Project Structure
 
 - `services/api`: FastAPI app, SQLAlchemy models, Alembic migrations, Celery stub.
