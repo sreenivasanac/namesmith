@@ -4,6 +4,8 @@ services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
+    env_file:
+      - ./app.env
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-namesmith_db}
       POSTGRES_USER: ${POSTGRES_USER:-namesmith_admin}
@@ -25,10 +27,6 @@ services:
     restart: unless-stopped
     env_file:
       - ./app.env
-    environment:
-      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
-      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
     depends_on:
       - db
       - redis
@@ -40,10 +38,10 @@ services:
       context: ..
       dockerfile: deploy/web.Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     restart: unless-stopped
-    environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}
+    env_file:
+      - ./app.env
     depends_on:
       - api
     ports:

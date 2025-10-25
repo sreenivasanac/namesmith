@@ -50,9 +50,9 @@ uv run pytest
   ```bash
   docker build -f deploy/web.Dockerfile -t namesmith-web .
   ```
-- Compose stack (expects `deploy/app.env` and `deploy/.env` to be populated):
+- Compose stack (expects `deploy/app.env` to be populated):
   ```bash
-  docker compose --env-file deploy/.env -f deploy/docker-compose.yaml up -d --build
+  docker compose -f deploy/docker-compose.yaml up -d --build
   ```
 
 ## Project Structure
