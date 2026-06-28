@@ -3,3 +3,8 @@ packages:
   - "packages/*"
 overrides:
   "@eslint/eslintrc>ajv": "^6.12.6"
+# Allow native build scripts these packages require (pnpm 10 blocks them by default).
+onlyBuiltDependencies:
+  - "@tailwindcss/oxide"
+  - esbuild
+  - sharp

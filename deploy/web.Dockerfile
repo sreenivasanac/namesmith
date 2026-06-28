@@ -6,7 +6,9 @@ ENV PNPM_HOME=/root/.local/share/pnpm
 ENV PATH=${PNPM_HOME}:${PATH}
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN corepack enable
+# Pin pnpm so the build is deterministic and honors onlyBuiltDependencies
+# (declared in pnpm-workspace.yaml) — older corepack-default pnpm ignores it.
+RUN corepack enable && corepack prepare pnpm@10.27.0 --activate
 
 WORKDIR /app
 
@@ -26,12 +28,16 @@ FROM node:22-bookworm-slim AS runner
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN corepack enable
-
 WORKDIR /app
 
-COPY --from=base /app/apps/web/.next/standalone ./standalone
-COPY --from=base /app/apps/web/.next/static ./standalone/apps/web/.next/static
+# Copy build output owned by root (NOT the runtime user) so the app tree is
+# read-only to the process -> blocks dropping/executing binaries in the app dir.
+# (This is the kill-chain step the 2026-01 cryptominer used: writable app dir + root.)
+COPY --from=base --chown=root:root /app/apps/web/.next/standalone ./standalone
+COPY --from=base --chown=root:root /app/apps/web/.next/static ./standalone/apps/web/.next/static
+
+# Run as the unprivileged 'node' user (uid 1000) shipped in the base image.
+USER node
 
 EXPOSE 3000
 
