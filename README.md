@@ -48,7 +48,7 @@ For production deployment to a VPS (Hetzner, DigitalOcean, AWS, etc.), see the c
 
 The guide covers:
 - Fully containerized setup with Docker Compose
-- Nginx reverse proxy with automatic SSL/HTTPS (Let's Encrypt)
+- Host Nginx reverse proxy with SSL/HTTPS via certbot (Let's Encrypt)
 - Database management and backups
 - Monitoring and troubleshooting
 

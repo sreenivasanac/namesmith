@@ -1,0 +1,22 @@
+# Security hardening overlay — added 2026-06-27 after the CVE-2025-55182 (Next.js RSC RCE)
+# cryptominer incident. docker compose auto-merges this with docker-compose.yaml.
+# Any one of these limits alone would have stopped that compromise from mining / fork-bombing.
+services:
+  web:
+    read_only: true            # immutable app filesystem (can't drop binaries)
+    tmpfs:
+      - /tmp                   # only writable scratch space
+      # If Next.js errors on boot with EROFS, also add its cache dir:
+      # - /app/standalone/apps/web/.next/cache
+    security_opt:
+      - no-new-privileges:true # block privilege escalation
+    cap_drop:
+      - ALL                    # drop all Linux capabilities
+    pids_limit: 256            # caps fork bombs (the incident spawned ~9,300 procs)
+    mem_limit: 1g              # caps memory theft
+    cpus: 1.5                  # caps CPU theft (the miner pinned all 4 cores)
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
